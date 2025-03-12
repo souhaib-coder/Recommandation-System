@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        /* 🎨 Styles Généraux */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    color: #333;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+
+/* 🏠 Conteneur Principal */
+.container {
+    width: 90%;
+    max-width: 600px;
+    background: #fff;
+    margin: 40px auto;
+    padding: 20px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+/* 📝 Titres */
+h1 {
+    color: #007BFF;
+}
+
+/* 🔗 Liens */
+a {
+    text-decoration: none;
+    color: #007BFF;
+    font-weight: bold;
+    margin: 10px;
+    display: inline-block;
+}
+
+a:hover {
+    color: #0056b3;
+}
+
+/* 🔘 Boutons */
+#submit {
+    background-color: #007BFF;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 10px;
+    display: inline-block;
+}
+
+#submit:hover {
+    background-color: #0056b3;
+}
+
+/* 📝 Formulaires */
+form {
+    margin-top: 20px;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+/* 📱 Responsive */
+@media (max-width: 600px) {
+    .container {
+        width: 95%;
+    }
+
+    input, #submit {
+        font-size: 14px;
+    }
+}
+
+    </style>
+</head>
+<body class="container">
+    <h1>dashboard</h1>
+    <a href="{{url_for('logout')}}">logout</a><br>
+    <a href="{{url_for('profil')}}">Profile</a><br>
+    <a href="{{ url_for('modifier_profil') }}">Modifier le profil</a>
+
+</body>
+</html>

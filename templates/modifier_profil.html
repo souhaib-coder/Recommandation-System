@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modifier le profil</title>
+    <style>
+        /* 🎨 Styles Généraux */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    color: #333;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+
+/* 🏠 Conteneur Principal */
+.container {
+    width: 90%;
+    max-width: 600px;
+    background: #fff;
+    margin: 40px auto;
+    padding: 20px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+/* 📝 Titres */
+h1 {
+    color: #007BFF;
+}
+
+/* 🔗 Liens */
+a {
+    text-decoration: none;
+    color: #007BFF;
+    font-weight: bold;
+    margin: 10px;
+    display: inline-block;
+}
+
+a:hover {
+    color: #0056b3;
+}
+
+/* 🔘 Boutons */
+#submit {
+    background-color: #007BFF;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 10px;
+    display: inline-block;
+}
+
+#submit:hover {
+    background-color: #0056b3;
+}
+
+/* 📝 Formulaires */
+form {
+    margin-top: 20px;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+/* 📱 Responsive */
+@media (max-width: 600px) {
+    .container {
+        width: 95%;
+    }
+
+    input, #submit {
+        font-size: 14px;
+    }
+}
+
+    </style>
+</head>
+<body class="container">
+    <h1>Modifier le profil</h1>
+    <form method="POST">
+        <label for="nom">Nom :</label>
+        <input type="text" id="nom" name="nom" value="{{ user.nom }}" required><br>
+
+        <label for="prenom">Prénom :</label>
+        <input type="text" id="prenom" name="prenom" value="{{ user.prenom }}" required><br>
+
+        <label for="email">Email :</label>
+        <input type="email" id="email" name="email" value="{{ user.email }}" required><br>
+
+        <button type="submit">Enregistrer les modifications</button>
+    </form>
+
+    <a href="{{ url_for('profil') }}">Retour au profil</a>
+</body>
+</html>
