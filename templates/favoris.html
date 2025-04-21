@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Favoris</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v={{ config['TEMPLATES_AUTO_RELOAD'] }}">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Liste des Favoris de {{ utilisateur.nom + " " + utilisateur.prenom }}</h1>
+
+        {% if favoris %}
+            <ul>
+                {% for favori in favoris %}
+                    <li class="favori">
+                        <a href="{{ url_for('courses.details_cours', id_cours=favori.cours_id) }}" class="historique-link">
+                        <strong>Cours :</strong> {{ favori.cours.nom }}<br>
+                        <strong>Date d'ajout :</strong> {{ favori.date_ajout }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Aucun favori trouvé.</p>
+        {% endif %}
+
+        <div class="actions">
+            <a href="/profil" class="btn">Retour à l'accueil</a>
+            <a href="{{ url_for('courses.dashboard') }}" class="btn">Dashboard</a>
+        </div>
+    </div>
+
+</body>
+</html>

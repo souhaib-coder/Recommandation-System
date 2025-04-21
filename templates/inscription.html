@@ -1,102 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>inscription</title>
-<style>
-    /* 🎨 Styles Généraux */
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
-    color: #333;
-    margin: 0;
-    padding: 0;
-    text-align: center;
-}
-
-/* 🏠 Conteneur Principal */
-.container {
-    width: 90%;
-    max-width: 600px;
-    background: #fff;
-    margin: 40px auto;
-    padding: 20px;
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-}
-
-/* 📝 Titres */
-h1 {
-    color: #007BFF;
-}
-
-/* 🔗 Liens */
-a {
-    text-decoration: none;
-    color: #007BFF;
-    font-weight: bold;
-    margin: 10px;
-    display: inline-block;
-}
-
-a:hover {
-    color: #0056b3;
-}
-
-/* 🔘 Boutons */
-#submit {
-    background-color: #007BFF;
-    color: white;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    margin-top: 10px;
-    display: inline-block;
-}
-
-#submit:hover {
-    background-color: #0056b3;
-}
-
-/* 📝 Formulaires */
-form {
-    margin-top: 20px;
-}
-
-input {
-    width: 100%;
-    padding: 10px;
-    margin: 10px 0;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-}
-
-/* 📱 Responsive */
-@media (max-width: 600px) {
-    .container {
-        width: 95%;
-    }
-
-    input, #submit {
-        font-size: 14px;
-    }
-}
-
-</style>
+    <title>Inscription - DevStorm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js" crossorigin="anonymous"></script>
+    <style>
+        .register-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background: #fff;
+        }
+    </style>
 </head>
-<body class="container">
-    <h1>regiter</h1>
-    <form action="" method="post">
-        {{ form.hidden_tag() }}
-        {{ form.nom }}
-        {{ form.prenom }}
-        {{ form.email }}
-        {{ form.password }}
-        {{ form.submit }}
-    </form>
-    <a href="{{url_for('login')}}">Login page</a>
+<body class="bg-light">
+    
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+        <a class="navbar-brand" href="/"><b>DevStorm</b></a>
+        <div class="ms-auto">
+            <a href="{{ url_for('auth.login') }}" class="btn btn-outline-light">Connexion</a>
+        </div>
+    </nav>
+
+    <!-- Register Form -->
+    <div class="register-container bg-white p-4 rounded">
+        <h2 class="text-center">Inscription</h2>
+        <form action="" method="post">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                {{ form.nom.label(class="form-label") }}
+                {{ form.nom(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.prenom.label(class="form-label") }}
+                {{ form.prenom(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.email.label(class="form-label") }}
+                {{ form.email(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.password.label(class="form-label") }}
+                {{ form.password(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.confirmation_password.label(class="form-label") }}
+                {{ form.confirmation_password(class="form-control") }}
+            </div>
+            <div class="mb-3">
+                {{ form.domaine_intérêt.label(class="form-label") }}
+                {{ form.domaine_intérêt(class="form-select") }}
+                {% if form.domaine_intérêt.errors %}
+                    <div class="text-danger">{{ form.domaine_intérêt.errors[0] }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="mb-3">
+                {{ form.objectifs.label(class="form-label") }}
+                {{ form.objectifs(class="form-select") }}
+                {% if form.objectifs.errors %}
+                    <div class="text-danger">{{ form.objectifs.errors[0] }}</div>
+                {% endif %}
+            </div>
+            
+            <button type="submit" class="btn btn-primary w-100">S'inscrire</button>
+        </form>
+        <div class="text-center mt-3">
+            <a href="{{ url_for('auth.login') }}">Déjà un compte ? Connecte-toi ici.</a>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

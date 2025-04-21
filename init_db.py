@@ -9,8 +9,8 @@ c.execute("PRAGMA foreign_keys = ON")
 # Table Utilisateurs
 c.execute('''
     CREATE TABLE IF NOT EXISTS Utilisateurs (
-        id_user INTEGER PRIMARY KEY AUTOINCREMENT,
-        Nom VARCHAR() NOT NULL,
+        id_user TEXT PRIMARY KEY,
+        Nom TEXT NOT NULL,
         Prenom TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         mot_de_passe TEXT NOT NULL,
@@ -39,7 +39,7 @@ c.execute('''
 c.execute('''
     CREATE TABLE IF NOT EXISTS Profils_Utilisateurs (
         id_profil INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
         domaine_intérêt TEXT NOT NULL CHECK (domaine_intérêt IN ('Informatique', 'Mathématiques', 'Physique', 'Langues')),
         objectifs TEXT CHECK (objectifs IN ('Révision', 'Préparation examen', 'Apprentissage','Approfondissement')),
         date_mise_à_jour TEXT DEFAULT CURRENT_TIMESTAMP,

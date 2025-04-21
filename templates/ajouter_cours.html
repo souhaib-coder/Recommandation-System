@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajouter un Cours</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Ajouter un Cours</h1>
+    <form method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        
+        <div>
+            <label for="nom">Nom du Cours</label>
+            {{ form.nom() }}
+        </div>
+        
+        <div>
+            <label for="type_ressource">Type de Ressource</label>
+            {{ form.type_ressource() }}
+        </div>
+        
+        <div>
+            <label for="domaine">Domaine</label>
+            {{ form.domaine() }}
+        </div>
+        
+        <div>
+            <label for="langue">Langue</label>
+            {{ form.langue() }}
+        </div>
+        
+        <div>
+            <label for="niveau">Niveau</label>
+            {{ form.niveau() }}
+        </div>
+        
+        <div>
+            <label for="objectifs">Objectifs</label>
+            {{ form.objectifs() }}
+        </div>
+        
+        <div>
+            <label for="durée">Durée (en heures)</label>
+            {{ form.durée() }}
+        </div>
+
+        <div>
+            <label for="fichier_cours">Fichier Cours</label>
+            {{ form.fichier_cours() }}
+        </div>
+
+        <div>
+            <button type="submit">Ajouter Le Cours</button>
+        </div>
+    </form>
+    <a href="{{ url_for('courses.dashboard') }}" class="btn btn-secondary">Retour</a>
+</div>
+<br><br>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
