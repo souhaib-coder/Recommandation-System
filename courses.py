@@ -86,7 +86,10 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 class AvisForm(FlaskForm):
-    note = IntegerField("Note (1 à 5)", validators=[DataRequired(), NumberRange(min=1, max=5)])
+    note = SelectField("Note (1 à 5)", 
+                      choices=[(1, "1"), (2, "2"), (3, "3"), (4, "4"), (5, "5")],
+                      validators=[DataRequired()],
+                      coerce=int)
     commentaire = TextAreaField("Commentaire")
     submit = SubmitField("Envoyer l'avis")
 
@@ -168,7 +171,7 @@ def details_cours(id_cours):
 
     return jsonify({
         "cours": {
-            "id": cours.id_cours,
+            "id_cours": cours.id_cours,
             "nom": cours.nom,
             "domaine": cours.domaine,
             "type_ressource": cours.type_ressource,
@@ -379,53 +382,56 @@ def supprimer_cours(id_cours):
 ####
 
 
-
 @courses_bp.route('/api/cours/avis/<int:id_cours>', methods=['GET', 'POST'])
 @login_required
 def ajouter_avis(id_cours):
     form = AvisForm()
-
-    if request.is_json:
-        form_data = request.get_json()
-        form = AvisForm(data=form_data)
-    
     cours = Cours.query.get_or_404(id_cours)
     user_id = current_user.id_user
-
-    if form.validate_on_submit():
-        note = form.note.data
-        commentaire = form.commentaire.data.strip()
-
-        avis_existant = Avis.query.filter_by(user_id=user_id, cours_id=id_cours).first()
-
-        if avis_existant:
-
-            if avis_existant.note != note:
-                avis_existant.note = note
-                message += "Votre note a été mise à jour. "
-
-            if commentaire:
+    message = ""
+    
+    # Check if this is an API request
+    if request.method == 'POST':
+        if request.is_json:
+            form_data = request.get_json()
+            form = AvisForm(data=form_data)
+        
+        if form.validate_on_submit():
+            note = form.note.data
+            commentaire = form.commentaire.data.strip()
+            
+            avis_existant = Avis.query.filter_by(user_id=user_id, cours_id=id_cours).first()
+            
+            if avis_existant:
+                if avis_existant.note != note:
+                    avis_existant.note = note
+                    message += "Votre note a été mise à jour. "
+                
+                if commentaire:
+                    nouvel_avis = Avis(
+                        user_id=user_id,
+                        cours_id=id_cours,
+                        note=avis_existant.note,
+                        commentaire=commentaire
+                    )
+                    db.session.add(nouvel_avis)
+                    message += "Commentaire ajouté."
+            else:
                 nouvel_avis = Avis(
-                user_id=user_id,
-                cours_id=id_cours,
-                note=avis_existant.note,
-                commentaire=commentaire
+                    user_id=user_id,
+                    cours_id=id_cours,
+                    note=note,
+                    commentaire=commentaire if commentaire else None
                 )
                 db.session.add(nouvel_avis)
-                message += "Commentaire ajouté."
-
-        else:
-            nouvel_avis = Avis(
-                user_id=user_id,
-                cours_id=id_cours,
-                note=note,
-                commentaire=commentaire if commentaire else None
-            )
-            db.session.add(nouvel_avis)
-            message = "Votre avis a été enregistré avec succès."
-        db.session.commit()
-        return jsonify({"message": message}), 201
-    return jsonify({"errors": form.errors}), 400
+                message = "Votre avis a été enregistré avec succès."
+            
+            db.session.commit()
+            return jsonify({"message": message}), 201
+        return jsonify({"errors": form.errors}), 400
+    
+    # If this function is called directly (not as a route handler)
+    return form
 
 def enregistrer_consultation(id_user, id_cours, titre_cours):
     # Vérifier si la consultation existe déjà

@@ -1,7 +1,5 @@
 import axios from 'axios';
-
 const API_URL = 'http://localhost:5000';
-
 axios.defaults.withCredentials = true;
 
 // 🔐 Auth
@@ -15,20 +13,18 @@ export const register = async (userData) => {
   return res.data;
 };
 
-
 export const getDashboardData = async (params = {}) => {
-    try {
-      const response = await axios.get(`${API_URL}/api/dashboard` , {
-        params,
-        withCredentials: true,
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Erreur lors du chargement du tableau de bord :", error.response?.data || error.message);
-
-    }
-  };
-  // api/api.js
+  try {
+    const response = await axios.get(`${API_URL}/api/dashboard`, {
+      params,
+      withCredentials: true,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors du chargement du tableau de bord :", error.response?.data || error.message);
+    throw error; // Relancer l'erreur pour permettre de la gérer dans le composant
+  }
+};
 
 export const searchCours = async (params = {}) => {
   try {
@@ -45,7 +41,9 @@ export const searchCours = async (params = {}) => {
 
 export const getCourseById = async (courseId) => {
   try {
-    const response = await axios.get(`${API_URL}/api/cours/details/${courseId}`);
+    const response = await axios.get(`${API_URL}/api/cours/details/${courseId}`, {
+      withCredentials: true
+    });
     return response.data;
   } catch (error) {
     console.error("Erreur lors de la récupération du cours :", error);
@@ -53,38 +51,54 @@ export const getCourseById = async (courseId) => {
   }
 };
 
-
+// CORRECTION: Utiliser axios de manière cohérente avec les autres appels API
 export const getCourseDetails = async (id) => {
-  const res = await fetch(`/api/cours/details/${id}`, {
-    credentials: "include",
-  });
-  return res.json();
+  try {
+    const response = await axios.get(`${API_URL}/api/cours/details/${id}`, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des détails du cours :", error.response?.data || error.message);
+    throw error;
+  }
 };
 
+// CORRECTION: Utiliser axios au lieu de fetch pour la cohérence
 export const toggleFavorite = async (id) => {
-  return fetch(`/api/profil/favoris/ajouter/${id}`, {
-    method: "POST",
-    credentials: "include",
-  });
+  try {
+    const response = await axios.post(`${API_URL}/api/profil/favoris/ajouter/${id}`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la modification des favoris :", error.response?.data || error.message);
+    throw error;
+  }
 };
 
+// CORRECTION: Utiliser axios au lieu de fetch
 export const deleteCourse = async (id) => {
-  return fetch(`/api/admin/cours/delete/${id}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
+  try {
+    const response = await axios.delete(`${API_URL}/api/admin/cours/delete/${id}`, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la suppression du cours :", error.response?.data || error.message);
+    throw error;
+  }
 };
 
+// CORRECTION: Utiliser axios au lieu de fetch
 export const submitReview = async (id, data) => {
-  const res = await fetch(`/api/cours/avis/${id}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return res.json();
+  try {
+    const response = await axios.post(`${API_URL}/api/cours/avis/${id}`, data, {
+      withCredentials: true,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la soumission de l'avis :", error.response?.data || error.message);
+    throw error;
+  }
 };
-
-  
-
-

@@ -1,17 +1,20 @@
 import { useEffect, useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
-const UserNavbar = () => {
+const UserNavbar = ({ onSearch }) => {
   const [scrolled, setScrolled] = useState(false);
   const [navbarOpen, setNavbarOpen] = useState(false);
-  const [activeLink, setActiveLink] = useState("/user/dashboard");
+  const [activeLink, setActiveLink] = useState("/Dashboard");
   const [hoverIndex, setHoverIndex] = useState(null);
+  const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const hoverRef = useRef(null);
   const indicatorRef = useRef(null);
+  const location = useLocation();
   
   // Définir les éléments de navigation
   const navItems = [
-    { to: "/user/dashboard", label: "Dashboard", icon: "speedometer2" },
+    { to: "/Dashboard", label: "Dashboard", icon: "speedometer2" },
     { to: "/user/favorites", label: "Favoris", icon: "heart-fill" },
     { to: "/user/history", label: "Historique", icon: "clock-history" },
     { to: "/user/profile", label: "Profil", icon: "person-circle" },
@@ -26,12 +29,12 @@ const UserNavbar = () => {
   
   // Détecter les changements de route et définir l'élément actif
   useEffect(() => {
-    const currentPath = window.location.pathname;
+    const currentPath = location.pathname;
     const matchingItem = navItems.find(item => currentPath.includes(item.to));
     if (matchingItem) {
       setActiveLink(matchingItem.to);
     }
-  }, [navItems]);
+  }, [location.pathname, navItems]);
 
   // Gérer les animations d'indicateur au survol
   useEffect(() => {
@@ -53,10 +56,29 @@ const UserNavbar = () => {
     scrolled ? "navbar-scrolled" : "navbar-default"
   }`;
 
+  // Gérer la soumission de recherche
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (onSearch && typeof onSearch === 'function') {
+      onSearch(search);
+    }
+    setNavbarOpen(false); // Fermer le menu sur mobile après la recherche
+  };
+
+  // Gérer la saisie dans le champ de recherche
+  const handleSearchInput = (e) => {
+    const value = e.target.value;
+    setSearch(value);
+    // Recherche en temps réel optionnelle
+    // if (onSearch && typeof onSearch === 'function') {
+    //   onSearch(value);
+    // }
+  };
+
   return (
     <>
       <nav className={navClass}>
-        <div className="container-fluid">
+        <div className="container">
           {/* Logo animé */}
           <Link className="navbar-brand" to="/">
             <div className="logo-container">
@@ -81,12 +103,25 @@ const UserNavbar = () => {
           
           {/* Menu de navigation */}
           <div className={`collapse navbar-collapse ${navbarOpen ? "show" : ""}`}>
-            {/* Recherche rapide */}
+            {/* Barre de recherche principale */}
             <div className="nav-search-wrapper me-auto ms-lg-4">
-              <div className="nav-search">
-                <i className="bi bi-search search-icon"></i>
-                <input type="text" placeholder="Rechercher un cours..." className="search-input" />
-              </div>
+              <form onSubmit={handleSearch} className="w-100">
+                <div className={`nav-search-main ${searchFocused ? 'focused' : ''}`}>
+                  <i className="bi bi-search search-icon"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Rechercher un cours, un sujet..." 
+                    className="search-input-main" 
+                    value={search}
+                    onChange={handleSearchInput}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => setSearchFocused(false)}
+                  />
+                  <button type="submit" className="search-submit-btn">
+                    <i className="bi bi-arrow-right"></i>
+                  </button>
+                </div>
+              </form>
             </div>
             
             {/* Liens de navigation avec indicateur interactif */}
@@ -102,7 +137,10 @@ const UserNavbar = () => {
                   <Link 
                     className={`nav-link ${activeLink === item.to ? 'active' : ''}`} 
                     to={item.to}
-                    onClick={() => setActiveLink(item.to)}
+                    onClick={() => {
+                      setActiveLink(item.to);
+                      setNavbarOpen(false); // Fermer le menu sur mobile après clic
+                    }}
                   >
                     <div className="nav-icon">
                       <i className={`bi bi-${item.icon}`}></i>
@@ -142,14 +180,15 @@ const UserNavbar = () => {
         }
         
         .navbar-default {
-          background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%);
-          backdrop-filter: blur(8px);
+          background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 100%);
+          backdrop-filter: blur(10px);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         .navbar-scrolled {
-          background: rgba(255, 255, 255, 0.95);
+          background: rgba(255, 255, 255, 0.98);
           backdrop-filter: blur(20px);
-          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.15);
         }
         
         /* Logo animé */
@@ -159,94 +198,137 @@ const UserNavbar = () => {
         }
         
         .logo-icon {
-          width: 35px;
-          height: 35px;
+          width: 38px;
+          height: 38px;
           background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
-          border-radius: 10px;
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
           color: white;
-          font-size: 1.2rem;
-          box-shadow: 0 5px 15px rgba(71, 118, 230, 0.3);
+          font-size: 1.3rem;
+          box-shadow: 0 5px 15px rgba(71, 118, 230, 0.4); 
           transform-origin: center;
           transition: all 0.3s ease;
         }
         
         .navbar-brand:hover .logo-icon {
           transform: rotate(15deg) scale(1.1);
+          box-shadow: 0 8px 20px rgba(71, 118, 230, 0.5);
         }
         
         .logo-text {
           font-weight: 800;
-          margin-left: 10px;
-          font-size: 1.3rem;
+          margin-left: 12px;
+          font-size: 1.4rem;
           background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
           -webkit-background-clip: text;
           background-clip: text;
           -webkit-text-fill-color: transparent;
           position: relative;
+          letter-spacing: -0.5px;
         }
         
         .navbar-default .logo-text {
           color: white;
           -webkit-text-fill-color: white;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         
-        /* Champ de recherche */
+        /* Champ de recherche global */
         .nav-search-wrapper {
-          max-width: 300px;
+          max-width: 450px;
           width: 100%;
         }
         
-        .nav-search {
-          background: rgba(255, 255, 255, 0.1);
+        .nav-search-main {
+          background: rgba(255, 255, 255, 0.2);
           border-radius: 100px;
-          padding: 0.5rem 1rem;
+          padding: 0.75rem 1.2rem;
           display: flex;
           align-items: center;
           transition: all 0.3s ease;
-          border: 1px solid transparent;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
         
-        .navbar-scrolled .nav-search {
+        .navbar-scrolled .nav-search-main {
           background: rgba(0, 0, 0, 0.05);
+          border-color: transparent;
         }
         
-        .nav-search:focus-within {
+        .nav-search-main.focused, .nav-search-main:focus-within {
           background: white;
           border-color: rgba(71, 118, 230, 0.5);
           box-shadow: 0 0 0 4px rgba(71, 118, 230, 0.15);
         }
         
         .search-icon {
-          color: #4776E6;
-          margin-right: 8px;
+          color: white;
+          margin-right: 12px;
+          font-size: 18px;
+          transition: all 0.3s ease;
         }
         
-        .search-input {
+        .nav-search-main.focused .search-icon, 
+        .navbar-scrolled .search-icon {
+          color: #4776E6;
+        }
+        
+        .search-input-main {
           background: transparent;
           border: none;
           outline: none;
           flex-grow: 1;
-          color: #333;
-          font-size: 14px;
+          font-size: 16px;
+          color: #333; /* Toujours noir lors de la saisie */
+          transition: all 0.3s ease;
         }
         
-        .navbar-default .search-input {
+        /* Couleur de texte et placeholder quand la navbar est transparente */
+        .navbar-default .search-input-main {
           color: white;
         }
         
-        .navbar-scrolled .search-input {
+        .navbar-default .search-input-main::placeholder {
+          color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .navbar-scrolled .search-input-main::placeholder {
+          color: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Quand le champ est focus, toujours noir */
+        .nav-search-main.focused .search-input-main {
           color: #333;
         }
         
-        .search-input::placeholder {
-          color: rgba(255, 255, 255, 0.8);
+        .nav-search-main.focused .search-input-main::placeholder {
+          color: rgba(0, 0, 0, 0.5);
         }
         
-        .navbar-scrolled .search-input::placeholder {
-          color: rgba(0, 0, 0, 0.5);
+        .search-submit-btn {
+          background: transparent;
+          border: none;
+          color: white;
+          font-size: 18px;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s ease;
+        }
+        
+        .nav-search-main.focused .search-submit-btn,
+        .navbar-scrolled .search-submit-btn {
+          color: #4776E6;
+        }
+        
+        .search-submit-btn:hover {
+          background: rgba(71, 118, 230, 0.1);
+          transform: scale(1.1);
         }
         
         /* Navigation avec indicateur de survol */
@@ -264,6 +346,7 @@ const UserNavbar = () => {
           background: linear-gradient(90deg, #4776E6, #8E54E9);
           transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
           opacity: 0;
+          box-shadow: 0 2px 8px rgba(71, 118, 230, 0.5);
         }
         
         .nav-item {
@@ -278,45 +361,86 @@ const UserNavbar = () => {
           padding: 12px 15px;
           transition: all 0.3s ease;
           position: relative;
-          color: rgba(255, 255, 255, 0.8);
+          color: white;
+          font-weight: 500;
         }
         
         .navbar-scrolled .nav-link {
           color: rgba(0, 0, 0, 0.7);
         }
         
-        .nav-link.active, .nav-link:hover {
+        .nav-link.active, 
+        .navbar-default .nav-link.active {
+          color: white;
+          text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        
+        .navbar-scrolled .nav-link.active {
+          color: #4776E6;
+          text-shadow: none;
+        }
+        
+        .nav-link:hover {
+          color: white;
+        }
+        
+        .navbar-scrolled .nav-link:hover {
           color: #4776E6;
         }
         
         .nav-icon {
-          font-size: 1.2rem;
-          margin-bottom: 3px;
+          font-size: 1.3rem;
+          margin-bottom: 4px;
           transition: all 0.3s ease;
+          color: inherit;
+        }
+        
+        .navbar-default .nav-icon i {
+          color: white;
+          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+        }
+        
+        .navbar-scrolled .nav-icon i {
+          color: inherit;
+          filter: none;
         }
         
         .nav-link:hover .nav-icon {
-          transform: translateY(-3px);
+          transform: translateY(-5px);
         }
         
         .nav-label {
           font-size: 0.8rem;
-          font-weight: 500;
+          font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.6px;
         }
         
         /* Bouton hamburger animé */
         .hamburger-button {
-          width: 40px;
-          height: 40px;
+          width: 42px;
+          height: 42px;
           border: none;
-          background: transparent;
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 8px;
           position: relative;
           display: flex;
           flex-direction: column;
           justify-content: space-around;
-          padding: 8px;
+          padding: 10px;
+          transition: all 0.3s ease;
+        }
+        
+        .hamburger-button:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .navbar-scrolled .hamburger-button {
+          background: rgba(0, 0, 0, 0.05);
+        }
+        
+        .navbar-scrolled .hamburger-button:hover {
+          background: rgba(0, 0, 0, 0.1);
         }
         
         .hamburger-line {
@@ -351,16 +475,16 @@ const UserNavbar = () => {
         }
         
         .btn-icon {
-          width: 40px;
-          height: 40px;
+          width: 42px;
+          height: 42px;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           border: none;
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.15);
           color: white;
-          font-size: 1.1rem;
+          font-size: 1.2rem;
           transition: all 0.3s ease;
           position: relative;
         }
@@ -371,34 +495,40 @@ const UserNavbar = () => {
         }
         
         .btn-icon:hover {
-          background: rgba(71, 118, 230, 0.1);
+          background: rgba(71, 118, 230, 0.2);
+          color: white;
+          transform: translateY(-3px);
+          box-shadow: 0 5px 15px rgba(71, 118, 230, 0.3);
+        }
+        
+        .navbar-scrolled .btn-icon:hover {
           color: #4776E6;
-          transform: translateY(-2px);
         }
         
         .notification-badge {
           position: absolute;
           top: -5px;
           right: -5px;
-          width: 18px;
-          height: 18px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
           background: #FF5757;
           color: white;
-          font-size: 0.6rem;
+          font-size: 0.7rem;
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: bold;
           border: 2px solid var(--bs-body-bg);
+          box-shadow: 0 2px 5px rgba(255, 87, 87, 0.5);
         }
         
         .notification-pulse {
           position: absolute;
           top: -5px;
           right: -5px;
-          width: 18px;
-          height: 18px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
           background-color: #FF5757;
           z-index: -1;
@@ -423,7 +553,7 @@ const UserNavbar = () => {
         .vertical-divider {
           width: 1px;
           height: 25px;
-          background: rgba(255, 255, 255, 0.2);
+          background: rgba(255, 255, 255, 0.3);
           margin: 0 15px;
         }
         
@@ -434,46 +564,80 @@ const UserNavbar = () => {
         .logout-btn {
           background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
           border: none;
-          padding: 0.5rem 1.2rem;
+          padding: 0.6rem 1.4rem;
           transition: all 0.3s ease;
-          box-shadow: 0 4px 15px rgba(71, 118, 230, 0.2);
+          box-shadow: 0 4px 15px rgba(71, 118, 230, 0.3);
+          font-weight: 600;
+          letter-spacing: 0.5px;
         }
         
         .logout-btn:hover {
-          box-shadow: 0 8px 20px rgba(71, 118, 230, 0.4);
+          box-shadow: 0 8px 20px rgba(71, 118, 230, 0.5);
           transform: translateY(-2px);
         }
         
         /* Responsive */
         @media (max-width: 992px) {
-          .navbar-default, .navbar-scrolled {
-            background: white;
-          }
-          
-          .navbar-collapse {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            margin-top: 15px;
-          }
-          
-          .navbar-default .nav-link,
-          .navbar-default .search-input,
-          .navbar-default .btn-icon {
-            color: #333;
-          }
-          
-          .navbar-default .search-input::placeholder {
-            color: rgba(0, 0, 0, 0.5);
-          }
-          
-          .navbar-default .hamburger-line {
-            background-color: #333;
+          .navbar-default {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
           }
           
           .navbar-default .logo-text {
             -webkit-text-fill-color: transparent;
+            text-shadow: none;
+          }
+          
+          .navbar-collapse {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+            padding: 20px;
+            margin-top: 15px;
+            border: 1px solid rgba(71, 118, 230, 0.1);
+          }
+          
+          .navbar-default .nav-link,
+          .navbar-default .btn-icon {
+            color: #333;
+          }
+          
+          .navbar-default .nav-icon i {
+            color: #333;
+            filter: none;
+          }
+          
+          .navbar-default .nav-link.active {
+            color: #4776E6;
+            text-shadow: none;
+          }
+          
+          .navbar-default .nav-link:hover {
+            color: #4776E6;
+          }
+          
+          .navbar-default .search-icon {
+            color: #4776E6;
+          }
+          
+          .navbar-default .search-input-main {
+            color: #333;
+          }
+          
+          .navbar-default .search-input-main::placeholder {
+            color: rgba(0, 0, 0, 0.5);
+          }
+          
+          .navbar-default .search-submit-btn {
+            color: #4776E6;
+          }
+          
+          .navbar-default .hamburger-button {
+            background: rgba(0, 0, 0, 0.05);
+          }
+          
+          .navbar-default .hamburger-line {
+            background-color: #333;
           }
           
           .nav-links {
@@ -491,7 +655,7 @@ const UserNavbar = () => {
             flex-direction: row;
             justify-content: flex-start;
             padding: 12px 15px;
-            border-radius: 8px;
+            border-radius: 10px;
           }
           
           .nav-link:hover {
@@ -501,6 +665,12 @@ const UserNavbar = () => {
           .nav-icon {
             margin-right: 15px;
             margin-bottom: 0;
+            width: 24px;
+            text-align: center;
+          }
+          
+          .nav-link:hover .nav-icon {
+            transform: translateX(5px);
           }
           
           .nav-indicator {
@@ -509,13 +679,18 @@ const UserNavbar = () => {
           
           .nav-search-wrapper {
             max-width: none;
-            margin-bottom: 15px;
+            margin: 15px 0;
+          }
+          
+          .nav-search-main {
+            background: rgba(0, 0, 0, 0.05);
+            border-color: transparent;
           }
           
           .nav-actions {
             width: 100%;
             justify-content: space-between;
-            margin-top: 15px;
+            margin-top: 20px;
           }
           
           .vertical-divider {
@@ -525,6 +700,7 @@ const UserNavbar = () => {
           .logout-btn {
             width: 100%;
             margin-top: 15px;
+            padding: 12px;
           }
         }
         
@@ -541,7 +717,33 @@ const UserNavbar = () => {
         }
         
         .navbar {
-          animation: fadeInDown 0.5s ease-out;
+          animation: fadeInDown 0.6s ease-out;
+        }
+        
+        /* Support pour les écrans internationaux */
+        .nav-label {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100px;
+        }
+        
+        /* Amélioration de l'accessibilité */
+        .nav-search-main:focus-within {
+          outline: none;
+          box-shadow: 0 0 0 4px rgba(71, 118, 230, 0.25);
+        }
+        
+        .nav-link:focus {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(71, 118, 230, 0.25);
+          border-radius: 10px;
+        }
+        
+        .btn-icon:focus, 
+        .search-submit-btn:focus {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(71, 118, 230, 0.25);
         }
       `}</style>
     </>
@@ -549,258 +751,3 @@ const UserNavbar = () => {
 };
 
 export default UserNavbar;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-
-const UserNavbar = () => {
-  const [scrolled, setScrolled] = useState(false);
-  const [navbarOpen, setNavbarOpen] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const navClass = `navbar fixed-top navbar-expand-lg py-3 px-4 transition-navbar ${
-    scrolled ? "navbar-scrolled" : "navbar-default"
-  }`;
-
-  return (
-    <>
-      <nav className={navClass}>
-        <div className="container-fluid">
-          <Link className="navbar-brand fw-bold fs-4 text-gradient" to="/">
-            <i className="bi bi-lightning-charge-fill me-2"></i>
-            <span className="brand-text">DevStorm</span>
-          </Link>
-          <button
-            className="navbar-toggler"
-            type="button"
-            aria-label="Toggle navigation"
-            onClick={() => setNavbarOpen(!navbarOpen)}
-          >
-            <span className="navbar-toggler-icon"></span>
-          </button>
-          <div className={`collapse navbar-collapse ${navbarOpen ? "show" : ""}`}>
-            <ul className="navbar-nav ms-auto align-items-center">
-              {[
-                { to: "/user/dashboard", label: "Dashboard", icon: "speedometer2" },
-                { to: "/user/favorites", label: "Favoris", icon: "heart-fill" },
-                { to: "/user/history", label: "Historique", icon: "clock-history" },
-                { to: "/user/profile", label: "Profil", icon: "person-circle" },
-              ].map((item, i) => (
-                <li className="nav-item mx-2" key={i}>
-                  <Link className="nav-link nav-custom" to={item.to}>
-                    <i className={`bi bi-${item.icon} me-2`}></i>
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-              <li className="nav-item ms-3">
-                <Link className="btn btn-primary btn-glow rounded-pill px-4" to="/logout">
-                  <i className="bi bi-box-arrow-right me-2"></i> Déconnexion
-                </Link>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </nav>
-
-     
-      <style jsx>{`
-        .transition-navbar {
-          transition: all 0.3s ease;
-        }
-        
-        .navbar-default {
-          background-color: transparent;
-        }
-        
-        .navbar-scrolled {
-          background-color: rgba(255, 255, 255, 0.95);
-          backdrop-filter: blur(10px);
-          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-        }
-        
-        .navbar-default .nav-custom {
-          color: white;
-          font-weight: 500;
-          transition: all 0.3s ease;
-        }
-        
-        .navbar-scrolled .nav-custom {
-          color: #333;
-          font-weight: 500;
-        }
-        
-        .nav-custom:hover {
-          color: #4776E6 !important;
-          transform: translateY(-2px);
-        }
-        
-        .text-gradient {
-          background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
-          -webkit-background-clip: text;
-          background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        
-        .navbar-default .brand-text {
-          color: white;
-          -webkit-text-fill-color: white;
-        }
-        
-        .navbar-scrolled .brand-text {
-          background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
-          -webkit-background-clip: text;
-          background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        
-        .btn-glow {
-          border: none;
-          position: relative;
-          background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
-          color: white;
-          transition: all 0.3s ease;
-        }
-        
-        .btn-glow:hover {
-          box-shadow: 0 5px 15px rgba(71, 118, 230, 0.4);
-          transform: translateY(-2px);
-        }
-        
-        @media (max-width: 992px) {
-          .navbar-default, .navbar-scrolled {
-            background-color: white;
-          }
-          
-          .navbar-default .nav-custom {
-            color: #333;
-          }
-          
-          .navbar-default .brand-text {
-            -webkit-text-fill-color: transparent;
-          }
-        }
-      `}</style>
-    </>
-  );
-};
-
-export default UserNavbar;*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-
-const UserNavbar = () => {
-  const [scrolled, setScrolled] = useState(false);
-  const [navbarOpen, setNavbarOpen] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const navClass = `navbar fixed-top navbar-expand-lg py-3 px-4 transition-navbar ${
-    scrolled ? "navbar-scrolled" : "navbar-default"
-  }`;
-
-  return (
-    <nav className={navClass}>
-      <div className="container-fluid">
-        <Link className="navbar-brand fw-bold fs-4 text-gradient" to="/">
-          <i className="bi bi-lightning-charge-fill me-2"></i>
-          DevStorm
-        </Link>
-
-        <button
-          className="navbar-toggler"
-          type="button"
-          aria-label="Toggle navigation"
-          onClick={() => setNavbarOpen(!navbarOpen)}
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
-
-        <div className={`collapse navbar-collapse ${navbarOpen ? "show" : ""}`}>
-          <ul className="navbar-nav ms-auto align-items-center">
-            {[
-              { to: "/user/dashboard", label: "Dashboard", icon: "speedometer2" },
-              { to: "/user/favorites", label: "Favoris", icon: "heart-fill" },
-              { to: "/user/history", label: "Historique", icon: "clock-history" },
-              { to: "/user/profile", label: "Profil", icon: "person-circle" },
-            ].map((item, i) => (
-              <li className="nav-item mx-2" key={i}>
-                <Link className="nav-link nav-custom" to={item.to}>
-                  <i className={`bi bi-${item.icon} me-2`}></i>
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-
-            <li className="nav-item mx-2">
-              <Link className="btn btn-outline-primary rounded-pill px-3" to="/logout">
-                <i className="bi bi-box-arrow-right me-2"></i> Déconnexion
-              </Link>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </nav>
-  );
-};
-
-export default UserNavbar;*/
