@@ -17,7 +17,11 @@ function Login() {
     try {
       const data = await login(form);
       if (data.success) {
-        navigate('/dashboard');  
+        if (data.admin) {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (err) {
       setMessage(err.response?.data?.message || 'Erreur lors de la connexion.');

@@ -1,27 +1,52 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 const AdminNavbar = ({ onSearch }) => {
   const [scrolled, setScrolled] = useState(false);
   const [navbarOpen, setNavbarOpen] = useState(false);
+  const [activeLink, setActiveLink] = useState("/admin/dashboard");
+  const [hoverIndex, setHoverIndex] = useState(null);
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const hoverRef = useRef(null);
+  const indicatorRef = useRef(null);
   const location = useLocation();
   
-  // Définir les éléments de navigation pour l'administrateur - simplified structure
+  // Définir les éléments de navigation pour l'administrateur
   const navItems = [
-    { to: "/admin/dashboard", label: "Dashboard", icon: "speedometer2" },
     { to: "/admin/courses", label: "Cours", icon: "book" },
     { to: "/admin/users", label: "Utilisateurs", icon: "people-fill" },
-    { to: "/admin/stats", label: "Statistiques", icon: "graph-up" },
     { to: "/admin/settings", label: "Paramètres", icon: "gear-fill" },
   ];
 
-  // Track scroll for navbar effect - simplified
+  // Track scroll for navbar effect
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  
+  // Route change detection
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const matchingItem = navItems.find(item => currentPath.includes(item.to));
+    if (matchingItem) setActiveLink(matchingItem.to);
+  }, [location.pathname, navItems]);
+
+  // Hover indicator animation
+  useEffect(() => {
+    if (hoverIndex !== null && hoverRef.current && indicatorRef.current) {
+      const element = hoverRef.current.children[hoverIndex];
+      const { width, left } = element.getBoundingClientRect();
+      const navLeft = hoverRef.current.getBoundingClientRect().left;
+      
+      indicatorRef.current.style.width = `${width}px`;
+      indicatorRef.current.style.left = `${left - navLeft}px`;
+      indicatorRef.current.style.opacity = '1';
+    } else if (indicatorRef.current) {
+      indicatorRef.current.style.opacity = '0';
+    }
+  }, [hoverIndex]);
   
   // Handle search submission
   const handleSearch = (e) => {
@@ -34,19 +59,21 @@ const AdminNavbar = ({ onSearch }) => {
 
   return (
     <>
-      <nav className={`navbar fixed-top navbar-expand-lg ${scrolled ? "navbar-scrolled" : "navbar-default"}`}>
-        <div className="container-fluid px-lg-4">
+      <nav className={`navbar fixed-top navbar-expand-lg py-2 ${scrolled ? "navbar-scrolled" : "navbar-default"}`}>
+        <div className="container">
           {/* Logo with Admin badge */}
           <Link className="navbar-brand" to="/admin/dashboard">
             <div className="logo-container">
-              <i className="bi bi-lightning-charge-fill logo-icon"></i>
-              <span className="logo-text">DevStorm<span className="admin-badge">Admin</span></span>
+              <div className="logo-icon">
+                <i className="bi bi-lightning-charge-fill"></i>
+              </div>
+              <div className="logo-text">DocStorm<span className="admin-badge">Admin</span></div>
             </div>
           </Link>
           
           {/* Hamburger button */}
           <button
-            className={`navbar-toggler ${navbarOpen ? 'active' : ''}`}
+            className={`navbar-toggler hamburger-button ${navbarOpen ? 'active' : ''}`}
             type="button"
             aria-label="Toggle navigation"
             onClick={() => setNavbarOpen(!navbarOpen)}
@@ -59,59 +86,79 @@ const AdminNavbar = ({ onSearch }) => {
           {/* Navbar content */}
           <div className={`collapse navbar-collapse ${navbarOpen ? "show" : ""}`}>
             {/* Search bar */}
-            <form onSubmit={handleSearch} className="nav-search-wrapper ms-auto ms-lg-4 me-lg-auto">
-              <div className="nav-search-main">
-                <i className="bi bi-search search-icon"></i>
-                <input 
-                  type="text" 
-                  placeholder="Rechercher..." 
-                  className="search-input" 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-            </form>
+            <div className="nav-search-wrapper me-auto ms-lg-4">
+              <form onSubmit={handleSearch} className="w-100">
+                <div className={`nav-search-main ${searchFocused ? 'focused' : ''}`}>
+                  <i className="bi bi-search search-icon"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Rechercher..." 
+                    className="search-input-main" 
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => setSearchFocused(false)}
+                  />
+                  <button type="submit" className="search-submit-btn">
+                    <i className="bi bi-arrow-right"></i>
+                  </button>
+                </div>
+              </form>
+            </div>
             
             {/* Navigation links */}
-            <ul className="navbar-nav nav-links align-items-center">
-              {navItems.map((item, i) => {
-                const isActive = location.pathname.includes(item.to);
-                return (
-                  <li className="nav-item" key={i}>
-                    <Link 
-                      className={`nav-link ${isActive ? 'active' : ''}`} 
-                      to={item.to}
-                      onClick={() => setNavbarOpen(false)}
-                    >
-                      <i className={`bi bi-${item.icon} nav-icon`}></i>
-                      <span className="nav-label d-lg-none">{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
+            <ul className="navbar-nav nav-links ms-auto align-items-center" ref={hoverRef}>
+              <div className="nav-indicator" ref={indicatorRef}></div>
+              {navItems.map((item, i) => (
+                <li 
+                  className="nav-item"
+                  key={i}
+                  onMouseEnter={() => setHoverIndex(i)}
+                  onMouseLeave={() => setHoverIndex(null)}
+                >
+                  <Link 
+                    className={`nav-link ${activeLink === item.to ? 'active' : ''}`} 
+                    to={item.to}
+                    onClick={() => {
+                      setActiveLink(item.to);
+                      setNavbarOpen(false);
+                    }}
+                  >
+                    <div className="nav-icon">
+                      <i className={`bi bi-${item.icon}`}></i>
+                    </div>
+                    <span className="nav-label">{item.label}</span>
+                  </Link>
+                </li>
+              ))}
             </ul>
             
             {/* Actions */}
-            <div className="nav-actions">
+            <div className="nav-actions ms-3">
               {/* Notifications */}
-              <button className="btn btn-icon position-relative">
-                <i className="bi bi-bell"></i>
-                {/* Only show badge if there are notifications */}
+              <button className="btn btn-icon notification-btn position-relative">
+                <i className="bi bi-bell-fill"></i>
                 <span className="notification-badge">5</span>
+                <span className="notification-pulse"></span>
               </button>
               
-              {/* Add Course Button - compact */}
+              <div className="vertical-divider"></div>
+              
+              {/* Add Course Button */}
               <Link 
-                className="btn btn-add d-none d-lg-flex"
+                className="btn btn-primary rounded-pill add-btn"
                 to="/admin/ajouter-cours"
                 title="Ajouter un cours"
               >
-                <i className="bi bi-plus-lg"></i>
+                <i className="bi bi-plus-lg me-md-2"></i>
+                <span className="d-none d-md-inline">Ajouter</span>
               </Link>
+              
+              <div className="vertical-divider"></div>
               
               {/* Admin dropdown */}
               <div className="dropdown">
-                <button className="btn btn-icon" type="button" id="adminMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                <button className="btn btn-icon admin-btn" type="button" id="adminMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                   <i className="bi bi-person-circle"></i>
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="adminMenuButton">
@@ -127,45 +174,58 @@ const AdminNavbar = ({ onSearch }) => {
       </nav>
 
       <style jsx>{`
-        /* Streamlined Navbar Styles */
+        /* Base navbar styles */
         .navbar {
-          padding: 0.5rem 1rem;
-          transition: all 0.3s ease;
-          height: 60px;
+          transition: all 0.4s ease;
+          padding: 0.6rem 0;
           z-index: 1030;
+          min-height: 60px;
         }
         
         .navbar-default {
-          background: rgba(13, 17, 23, 0.9);
-          backdrop-filter: blur(10px);
+          background: transparent;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
         
         .navbar-scrolled {
           background: rgba(255, 255, 255, 0.98);
-          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+          backdrop-filter: blur(15px);
+          box-shadow: 0 5px 20px -5px rgba(0, 0, 0, 0.1);
         }
         
-        /* Compact Logo */
+        /* Logo */
         .logo-container {
           display: flex;
           align-items: center;
         }
         
         .logo-icon {
-          font-size: 1.2rem;
-          color: #FF7600;
-          margin-right: 8px;
+          width: 32px;
+          height: 32px;
+          background: linear-gradient(135deg, #FF7600 0%, #FF5500 100%);
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 1.1rem;
+          box-shadow: 0 4px 10px rgba(255, 118, 0, 0.3);
+          transition: all 0.3s ease;
+        }
+        
+        .navbar-brand:hover .logo-icon {
+          transform: rotate(15deg) scale(1.1);
         }
         
         .logo-text {
           font-weight: 700;
-          font-size: 1.1rem;
-          color: white;
+          margin-left: 10px;
+          font-size: 1.2rem;
+          background: linear-gradient(135deg, #FF7600 0%, #FF5500 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
           position: relative;
-        }
-        
-        .navbar-scrolled .logo-text {
-          color: #333;
         }
         
         .admin-badge {
@@ -177,77 +237,95 @@ const AdminNavbar = ({ onSearch }) => {
           padding: 1px 3px;
           margin-left: 5px;
           vertical-align: text-top;
+          -webkit-text-fill-color: white;
         }
         
-        /* Search bar */
+        /* Search */
         .nav-search-wrapper {
-          max-width: 300px;
+          max-width: 400px;
           width: 100%;
         }
         
         .nav-search-main {
-          background: rgba(255, 255, 255, 0.15);
-          border-radius: 20px;
+          background: rgba(240, 240, 240, 0.5);
+          border-radius: 100px;
+          padding: 0.5rem 1rem;
           display: flex;
           align-items: center;
-          height: 36px;
-          padding: 0 12px;
+          transition: all 0.3s ease;
+          border: 1px solid transparent;
         }
         
         .navbar-scrolled .nav-search-main {
-          background: rgba(0, 0, 0, 0.05);
+          background: rgba(0, 0, 0, 0.03);
         }
         
-        .search-icon {
-          color: rgba(255, 255, 255, 0.7);
-          font-size: 0.9rem;
-          margin-right: 8px;
+        .nav-search-main.focused {
+          background: white;
+          border-color: rgba(255, 118, 0, 0.5);
+          box-shadow: 0 0 0 3px rgba(255, 118, 0, 0.1);
         }
         
-        .navbar-scrolled .search-icon {
-          color: rgba(0, 0, 0, 0.5);
+        .search-icon, .search-input-main, .search-submit-btn {
+          color: #333;
+          transition: all 0.3s ease;
         }
         
-        .search-input {
+        .nav-search-main.focused .search-icon,
+        .nav-search-main.focused .search-submit-btn {
+          color: #FF7600;
+        }
+        
+        .search-input-main {
           background: transparent;
           border: none;
           outline: none;
-          width: 100%;
-          font-size: 0.9rem;
-          color: white;
-        }
-        
-        .navbar-scrolled .search-input {
+          flex-grow: 1;
+          font-size: 14px;
           color: #333;
         }
         
-        .search-input::placeholder {
-          color: rgba(255, 255, 255, 0.7);
+        .search-submit-btn {
+          background: transparent;
+          border: none;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         
-        .navbar-scrolled .search-input::placeholder {
-          color: rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Navigation icons */
+        /* Navigation */
         .nav-links {
+          position: relative;
+          display: flex;
           margin: 0 10px;
         }
         
+        .nav-indicator {
+          position: absolute;
+          bottom: -2px;
+          height: 2px;
+          border-radius: 2px;
+          background: linear-gradient(90deg, #FF7600, #FF5500);
+          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          opacity: 0;
+        }
+        
         .nav-item {
-          margin: 0 5px;
+          position: relative;
+          margin: 0 8px;
         }
         
         .nav-link {
-          color: rgba(255, 255, 255, 0.7);
-          padding: 0.5rem;
-          border-radius: 8px;
-          transition: all 0.2s ease;
-          position: relative;
-        }
-        
-        .navbar-scrolled .nav-link {
-          color: rgba(0, 0, 0, 0.6);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 8px 12px;
+          transition: all 0.3s ease;
+          color: #333;
+          font-weight: 500;
         }
         
         .nav-link.active {
@@ -255,138 +333,158 @@ const AdminNavbar = ({ onSearch }) => {
         }
         
         .nav-link:hover {
-          color: white;
-          background: rgba(255, 255, 255, 0.1);
-        }
-        
-        .navbar-scrolled .nav-link:hover {
           color: #FF7600;
-          background: rgba(255, 136, 0, 0.1);
         }
         
         .nav-icon {
-          font-size: 1.2rem;
-        }
-        
-        /* Actions area */
-        .nav-actions {
-          display: flex;
-          align-items: center;
-          margin-left: 15px;
-        }
-        
-        .btn-icon {
-          width: 36px;
-          height: 36px;
-          padding: 0;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: none;
-          background: transparent;
-          color: rgba(255, 255, 255, 0.7);
           font-size: 1.1rem;
-          margin: 0 5px;
-          transition: all 0.2s ease;
+          margin-bottom: 2px;
+          transition: all 0.3s ease;
         }
         
-        .navbar-scrolled .btn-icon {
-          color: rgba(0, 0, 0, 0.6);
+        .nav-link:hover .nav-icon {
+          transform: translateY(-3px);
         }
         
-        .btn-icon:hover {
-          background: rgba(255, 255, 255, 0.1);
-          color: white;
+        .nav-label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
         
-        .navbar-scrolled .btn-icon:hover {
-          background: rgba(0, 0, 0, 0.05);
-          color: #FF7600;
-        }
-        
-        .notification-badge {
-          position: absolute;
-          top: 0;
-          right: 0;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: #FF5757;
-          color: white;
-          font-size: 0.6rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-        }
-        
-        .btn-add {
+        /* Hamburger */
+        .hamburger-button {
           width: 36px;
           height: 36px;
-          border-radius: 8px;
-          background: #FF7600;
-          color: white;
           border: none;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 5px;
-          transition: all 0.2s ease;
-        }
-        
-        .btn-add:hover {
-          background: #FF5500;
-          color: white;
-        }
-        
-        /* Hamburger button */
-        .navbar-toggler {
-          width: 36px;
-          height: 36px;
-          padding: 5px;
-          border: none;
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 8px;
+          background: rgba(240, 240, 240, 0.5);
+          border-radius: 6px;
+          position: relative;
           display: flex;
           flex-direction: column;
           justify-content: space-around;
-          transition: all 0.2s ease;
-        }
-        
-        .navbar-scrolled .navbar-toggler {
-          background: rgba(0, 0, 0, 0.05);
+          padding: 8px;
+          transition: all 0.3s ease;
         }
         
         .hamburger-line {
           width: 100%;
           height: 2px;
-          background-color: white;
-          border-radius: 5px;
-          transition: all 0.3s;
-        }
-        
-        .navbar-scrolled .hamburger-line {
           background-color: #333;
+          border-radius: 10px;
+          transition: all 0.3s ease;
         }
         
-        .navbar-toggler.active .hamburger-line:nth-child(1) {
-          transform: translateY(8px) rotate(45deg);
+        .hamburger-button.active .hamburger-line:nth-child(1) {
+          transform: translateY(7px) rotate(45deg);
         }
         
-        .navbar-toggler.active .hamburger-line:nth-child(2) {
+        .hamburger-button.active .hamburger-line:nth-child(2) {
           opacity: 0;
         }
         
-        .navbar-toggler.active .hamburger-line:nth-child(3) {
-          transform: translateY(-8px) rotate(-45deg);
+        .hamburger-button.active .hamburger-line:nth-child(3) {
+          transform: translateY(-7px) rotate(-45deg);
+        }
+        
+        /* Action buttons */
+        .nav-actions {
+          display: flex;
+          align-items: center;
+        }
+        
+        .btn-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: none;
+          background: rgba(240, 240, 240, 0.5);
+          color: #333;
+          font-size: 1rem;
+          transition: all 0.3s ease;
+          position: relative;
+        }
+        
+        .btn-icon:hover {
+          background: rgba(255, 118, 0, 0.1);
+          color: #FF7600;
+        }
+        
+        .notification-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #FF5757;
+          color: white;
+          font-size: 0.65rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
+          border: 2px solid white;
+        }
+        
+        .notification-pulse {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background-color: #FF5757;
+          z-index: -1;
+          animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+          0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(255, 87, 87, 0.7);
+          }
+          70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 8px rgba(255, 87, 87, 0);
+          }
+          100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(255, 87, 87, 0);
+          }
+        }
+        
+        .vertical-divider {
+          width: 1px;
+          height: 20px;
+          background: rgba(0, 0, 0, 0.1);
+          margin: 0 12px;
+        }
+        
+        .add-btn {
+          background: linear-gradient(135deg, #FF7600 0%, #FF5500 100%);
+          border: none;
+          padding: 0.4rem 1.2rem;
+          transition: all 0.3s ease;
+          box-shadow: 0 3px 10px rgba(255, 118, 0, 0.2);
+          font-weight: 600;
+          font-size: 0.9rem;
+        }
+        
+        .add-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(255, 118, 0, 0.3);
         }
         
         /* Dropdown menu */
         .dropdown-menu {
           border: none;
-          border-radius: 8px;
-          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+          border-radius: 12px;
+          box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
           padding: 0.5rem;
           margin-top: 10px;
           min-width: 180px;
@@ -394,7 +492,7 @@ const AdminNavbar = ({ onSearch }) => {
         
         .dropdown-item {
           padding: 0.5rem 1rem;
-          border-radius: 5px;
+          border-radius: 8px;
           transition: all 0.2s ease;
           font-size: 0.9rem;
         }
@@ -407,16 +505,12 @@ const AdminNavbar = ({ onSearch }) => {
           background: rgba(220, 53, 69, 0.1);
         }
         
-        /* Responsive styles */
+        /* Responsive */
         @media (max-width: 992px) {
-          .navbar {
-            height: auto;
-          }
-          
           .navbar-collapse {
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
             padding: 15px;
             margin-top: 10px;
           }
@@ -429,48 +523,40 @@ const AdminNavbar = ({ onSearch }) => {
           
           .nav-item {
             width: 100%;
-            margin: 2px 0;
+            margin: 3px 0;
           }
           
           .nav-link {
-            display: flex;
-            align-items: center;
-            padding: 10px;
-            color: #333;
+            flex-direction: row;
+            justify-content: flex-start;
           }
           
           .nav-icon {
-            margin-right: 10px;
-            width: 20px;
-            text-align: center;
+            margin-right: 12px;
+            margin-bottom: 0;
+          }
+          
+          .nav-search-wrapper {
+            max-width: none;
+            margin: 10px 0;
           }
           
           .nav-actions {
             width: 100%;
             justify-content: space-between;
-            margin: 10px 0 0;
-            padding-top: 10px;
-            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            margin-top: 15px;
+            flex-wrap: wrap;
           }
           
-          .btn-icon, .btn-add {
-            color: #333;
-            background: rgba(0, 0, 0, 0.05);
+          .add-btn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px;
+            order: 1;
           }
           
-          .btn-add {
-            display: flex !important;
-            width: auto;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            background: #FF7600;
-            color: white;
-          }
-          
-          .btn-add::after {
-            content: "Ajouter un cours";
-            margin-left: 8px;
-            font-size: 0.9rem;
+          .vertical-divider {
+            display: none;
           }
         }
       `}</style>

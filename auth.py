@@ -88,7 +88,7 @@ def login():
         if user:
             if bcrypt.check_password_hash(user.mot_de_passe, form.password.data):
                 login_user(user)
-                return jsonify({'success': True, 'message': 'Connexion réussie'})
+                return jsonify({'success': True, 'message': 'Connexion réussie', "admin": current_user.rôle == 'admin'})
         return jsonify({'success': False, 'message': 'Identifiants invalides'}), 401
     return jsonify({'success': False, 'message': form.errors}), 400
 

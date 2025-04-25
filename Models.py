@@ -112,6 +112,7 @@ class Favoris(db.Model):
     cours_id = db.Column(db.Integer, db.ForeignKey("Cours.id_cours", ondelete="CASCADE"), primary_key=True)
     date_ajout = db.Column(db.Text, default=db.func.current_timestamp())
 
+    
     utilisateur = db.relationship("Utilisateurs", back_populates="favoris", passive_deletes=True)
     cours = db.relationship("Cours", back_populates="favoris", passive_deletes=True)
 

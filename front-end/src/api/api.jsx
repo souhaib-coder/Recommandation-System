@@ -13,6 +13,19 @@ export const register = async (userData) => {
   return res.data;
 };
 
+
+export const logout = async () => {
+  try {
+    const response = await axios.post(`${API_URL}/api/deconnexion`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la déconnexion :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export const getDashboardData = async (params = {}) => {
   try {
     const response = await axios.get(`${API_URL}/api/dashboard`, {
@@ -38,6 +51,20 @@ export const searchCours = async (params = {}) => {
     return [];
   }
 };
+
+export const AdminCours = async (params = {}) => {
+  try {
+    const response = await axios.get(`${API_URL}/api/admin/cours`, {
+      params,
+      withCredentials: true,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la recherche de cours :", error.response?.data || error.message);
+    return [];
+  }
+};
+
 
 export const getCourseById = async (courseId) => {
   try {
@@ -77,10 +104,95 @@ export const toggleFavorite = async (id) => {
   }
 };
 
-// CORRECTION: Utiliser axios au lieu de fetch
+
+
+// In api.jsx
+export const submitReview = async (id, data) => {
+  try {
+    // Make sure data has the expected structure for WTForms
+    const formData = {
+      note: parseInt(data.note), // WTForms expects an integer
+      commentaire: data.commentaire || ''
+    };
+    
+    const response = await axios.post(`${API_URL}/api/cours/avis/${id}`, formData, {
+      withCredentials: true,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la soumission de l'avis :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fonctions pour le tableau de bord administrateur
+
+// Récupérer les statistiques générales de l'application// Fonctions pour le tableau de bord administrateur
+
+// Récupérer les statistiques générales de l'application
+export const getAdminStats = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/admin/stats`, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des statistiques admin :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Récupérer les cours les plus populaires
+export const getTopCourses = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/admin/top-courses`, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des cours populaires :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Récupérer l'activité des cours sur une période donnée
+export const getCoursesActivity = async (timeFrame = 'week') => {
+  try {
+    const response = await axios.get(`${API_URL}/api/admin/courses-activity`, {
+      params: { timeFrame },
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération de l'activité des cours :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Récupérer l'activité des utilisateurs sur une période donnée
+export const getUsersActivity = async (timeFrame = 'week') => {
+  try {
+    const response = await axios.get(`${API_URL}/api/admin/users-activity`, {
+      params: { timeFrame },
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération de l'activité utilisateurs :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Ne pas modifier cette fonction si elle existe déjà dans votre code
+// Nous laissons la méthode POST puisque c'est ce que votre backend attend
+
+// Fonction pour supprimer un cours (correction - changé de méthode HTTP DELETE à POST)
 export const deleteCourse = async (id) => {
   try {
-    const response = await axios.delete(`${API_URL}/api/admin/cours/delete/${id}`, {
+    const response = await axios.post(`${API_URL}/api/admin/cours/delete/${id}`, {}, {
       withCredentials: true
     });
     return response.data;
@@ -90,15 +202,32 @@ export const deleteCourse = async (id) => {
   }
 };
 
-// CORRECTION: Utiliser axios au lieu de fetch
-export const submitReview = async (id, data) => {
+// Ajouter un nouveau cours
+export const addCourse = async (formData) => {
   try {
-    const response = await axios.post(`${API_URL}/api/cours/avis/${id}`, data, {
-      withCredentials: true,
-    });
+    const response = await axios.post(
+      `${API_URL}/api/admin/cours/ajouter`,
+      formData,
+      { withCredentials: true }
+    );
     return response.data;
   } catch (error) {
-    console.error("Erreur lors de la soumission de l'avis :", error.response?.data || error.message);
+    console.error("Erreur lors de l'ajout du cours :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Mettre à jour un cours existant
+export const updateCourse = async (courseId, formData) => {
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/admin/cours/update/${courseId}`,
+      formData,
+      { withCredentials: true }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour du cours :", error.response?.data || error.message);
     throw error;
   }
 };

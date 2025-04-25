@@ -5,6 +5,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import DetailCours from './pages/DetailCours';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminCourses from './pages/AdminCourses';
+import logout from './api/api';
 
 function App() {
   return (
@@ -12,9 +15,12 @@ function App() {
       <Routes>
         <Route path='/' element={<Home />} />
         <Route path='/Login' element={<Login />} />
+        <Route path='/Logout' element={<logout />} />
         <Route path='/Register' element={<Register />} />
         <Route path="/Dashboard" element={<Dashboard />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/DetailCours/:id" element={<DetailCours />} />
+        <Route path="/admin/courses" element={<AdminCourses />} />
       </Routes>
     </>
   );

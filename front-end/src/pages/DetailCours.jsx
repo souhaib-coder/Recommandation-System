@@ -16,11 +16,16 @@ const DetailCours = () => {
   const [admin, setAdmin] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [avisList, setAvisList] = useState([]);
-  const [formData, setFormData] = useState({ note: "", commentaire: "" });
+  const [formData, setFormData] = useState({
+    note: 5, // Default to 5 stars
+    commentaire: ""
+  });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -76,16 +81,31 @@ const DetailCours = () => {
     }
   };
 
+  
+  
+  // Handle form submission
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     try {
-      const res = await submitReview(id, formData);
-      setMessage("Avis soumis avec succès !");
-      setAvisList((prev) => [...prev, res]);
-      setFormData({ note: "", commentaire: "" });
+      const response = await submitReview(id, formData);
+      setMessage(response.message || "Avis soumis avec succès !");
+      
+      // If the response includes a new review, add it to the list
+      if (response.id) {
+        setAvisList((prev) => [...prev, {
+          id: response.id,
+          utilisateur: response.utilisateur,
+          note: response.note,
+          commentaire: response.commentaire,
+          date: response.date
+        }]);
+      }
+      
+      setFormData({ note: 5, commentaire: "" });
+      setShowReviewForm(false);
       setTimeout(() => setMessage(""), 3000);
     } catch (error) {
-      setError("Erreur lors de la soumission de l'avis");
+      setError(error.response?.data?.errors || "Erreur lors de la soumission de l'avis");
       setTimeout(() => setError(""), 3000);
     }
   };
@@ -98,6 +118,25 @@ const DetailCours = () => {
       "Avancé": "bg-danger",
     };
     return colors[niveau] || "bg-secondary";
+  };
+
+
+  // Fonction pour extraire l'ID de la vidéo YouTube depuis l'URL
+  const getYoutubeVideoId = (url) => {
+    if (!url) return '';
+    
+    // Pour les URLs de format https://youtu.be/VIDEO_ID
+    if (url.includes('youtu.be')) {
+      return url.split('youtu.be/')[1].split('?')[0];
+    }
+    
+    // Pour les URLs de format https://www.youtube.com/watch?v=VIDEO_ID
+    if (url.includes('youtube.com/watch')) {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      return urlParams.get('v');
+    }
+    
+    return '';
   };
 
   if (loading) return (
@@ -137,7 +176,7 @@ const DetailCours = () => {
           <i className="bi bi-exclamation-triangle me-2"></i>
           Aucun cours trouvé avec cet identifiant.
         </div>
-        <Link to="/dashboard" className="btn" style={{
+        <Link to="/Dashboard" className="btn" style={{
           background: "var(--primary-color)",
           color: "var(--white)",
           borderRadius: "var(--border-radius-lg)"
@@ -152,27 +191,55 @@ const DetailCours = () => {
     <div className="education-dashboard" style={{background: "var(--light-bg)"}}>
       {isAdmin ? <AdminNavbar /> : <UserNavbar />}
       
-      {/* Hero Banner */}
+      {/* Hero Banner with Course Info */}
       <div className="hero-section text-white position-relative" style={{
         background: `linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%)`,
-        minHeight: "250px",
+        minHeight: "280px",
         marginTop: "70px",
-        padding: "3rem 0"
+        padding: "2rem 0"
       }}>
         <div className="container position-relative" style={{zIndex: "2"}}>
           <div className="row align-items-center">
-            <div className="col-lg-12 py-4">
+            <div className="col-lg-8 py-3">
               <div className="d-flex align-items-center mb-2">
                 <span className={`badge ${getNiveauBadgeClass(course.niveau)} me-2`}>{course.niveau}</span>
-                <span className="badge" style={{background: "rgba(255,255,255,0.2)"}}>{course.domaine}</span>
-                <div className="ms-auto">
-                  <span className="badge" style={{background: "rgba(255,255,255,0.2)"}}>
-                    <i className="bi bi-eye me-1"></i> {course.nombre_vues} vues
-                  </span>
-                </div>
+                <span className="badge me-2" style={{background: "rgba(255,255,255,0.2)"}}>{course.domaine}</span>
+                <span className="badge me-2" style={{background: "rgba(255,255,255,0.2)"}}>{course.type_ressource}</span>
+                <span className="badge me-2" style={{background: "rgba(255,255,255,0.2)"}}>{course.langue}</span>
+                <span className="badge" style={{background: "rgba(255,255,255,0.2)"}}>
+                  <i className="bi bi-eye me-1"></i> {course.nombre_vues} vues
+                </span>
               </div>
               <h1 className="display-5 fw-bold mb-3">{course.nom}</h1>
-              <p className="lead mb-0 opacity-90">{course.type_ressource} • {course.langue}</p>
+              
+              {/* Admin Actions */}
+              {admin && (
+                <div className="mt-3">
+                  <div className="btn-group">
+                    <Link to={`/admin/modifier/${course.id_cours}`} className="btn btn-light" style={{borderRadius: "var(--border-radius-lg) 0 0 var(--border-radius-lg)"}}>
+                      <i className="bi bi-pencil me-2 text-success"></i> Modifier
+                    </Link>
+                    <button onClick={handleDelete} className="btn btn-light" style={{borderRadius: "0 var(--border-radius-lg) var(--border-radius-lg) 0"}}>
+                      <i className="bi bi-trash me-2 text-danger"></i> Supprimer
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Favorite Button - Moved to Right */}
+            <div className="col-lg-4 py-3 text-lg-end">
+              <button
+                className={`btn btn-lg shadow ${isFavorite ? "btn-warning" : "btn-light"}`}
+                onClick={handleToggleFavorite}
+                style={{
+                  borderRadius: "var(--border-radius-lg)",
+                  transition: "all 0.3s ease"
+                }}
+              >
+                <i className={`bi ${isFavorite ? 'bi-star-fill' : 'bi-star'} me-2`}></i>
+                {isFavorite ? "Retiré des favoris" : "Ajouter aux favoris"}
+              </button>
             </div>
           </div>
         </div>
@@ -192,9 +259,9 @@ const DetailCours = () => {
           </div>
         )}
         
-        <div className="row g-4">
-          {/* Left Column */}
-          <div className="col-lg-8">
+        <div className="row">
+          {/* Main Column - Centered Content */}
+          <div className="col-lg-10 mx-auto">
             {/* Course Content Section */}
             <div className="card border-0 shadow-sm rounded-lg mb-4 overflow-hidden">
               <div className="card-header border-0 py-3 d-flex justify-content-between align-items-center" style={{background: "var(--white)"}}>
@@ -204,29 +271,40 @@ const DetailCours = () => {
                 </h5>
               </div>
               <div className="card-body p-0">
-                {course.chemin_source?.endsWith(".mp4") ? (
-                  <video className="w-100" controls>
-                    <source src={`${process.env.PUBLIC_URL}/static/${course.chemin_source}`} type="video/mp4" />
-                    Votre navigateur ne supporte pas la lecture vidéo.
-                  </video>
-                ) : course.chemin_source?.endsWith(".pdf") ? (
-                  <div className="ratio ratio-16x9" style={{ minHeight: "600px" }}>
-                    <iframe
-                      className="w-100"
-                      src={`http://localhost:5000/static/${course.chemin_source}`}
-                      title="PDF du cours"
-                    ></iframe>
-                  </div>
-                ) : (
-                  <div className="p-5 text-center text-muted">
-                    <i className="bi bi-file-earmark-text display-4 mb-3"></i>
-                    <p>Aucun contenu multimédia disponible pour ce cours.</p>
-                  </div>
-                )}
+              {course.chemin_source?.includes("youtube.com") || course.chemin_source?.includes("youtu.be") ? (
+              <div className="ratio ratio-16x9" style={{ maxHeight: "550px" }}>
+                <iframe
+                  className="w-100"
+                  src={`https://www.youtube.com/embed/${getYoutubeVideoId(course.chemin_source)}`}
+                  title="YouTube video player"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+                    </div>
+                  ) : course.chemin_source?.endsWith(".mp4") ? (
+                    <video className="w-100" controls style={{ maxHeight: "550px" }}>
+                      <source src={`http://localhost:5000/static/${course.chemin_source}`} type="video/mp4" />
+                      Votre navigateur ne supporte pas la lecture vidéo.
+                    </video>
+                  ) : course.chemin_source?.endsWith(".pdf") ? (
+                    <div className="ratio ratio-16x9" style={{ height: "550px" }}>
+                  <iframe
+                    className="w-100"
+                    src={`http://localhost:5000/static/${course.chemin_source}`}
+                    title="PDF du cours"
+                  ></iframe>
+              </div>
+            ) : (
+              <div className="p-5 text-center text-muted">
+                <i className="bi bi-file-earmark-text display-4 mb-3"></i>
+                <p>Aucun contenu multimédia disponible pour ce cours.</p>
+              </div>
+            )}
               </div>
             </div>
 
-            {/* Course Objectives Section */}
+            {/* Course Objectives Section 
             <div className="card border-0 shadow-sm rounded-lg mb-4">
               <div className="card-header border-0 py-3" style={{background: "var(--white)"}}>
                 <h5 className="m-0 fw-bold">
@@ -237,225 +315,188 @@ const DetailCours = () => {
               <div className="card-body">
                 <p className="lead mb-0">{course.objectifs}</p>
               </div>
-            </div>
-
-            {/* Reviews Section */}
-            <div className="card border-0 shadow-sm rounded-lg mb-4">
-              <div className="card-header border-0 py-3 d-flex justify-content-between align-items-center" style={{background: "var(--white)"}}>
-                <h5 className="m-0 fw-bold">
-                  <i className="bi bi-chat-quote me-2" style={{color: "var(--primary-color)"}}></i>
-                  Avis des utilisateurs
-                </h5>
-                <span className="badge rounded-pill" style={{background: "var(--primary-color)", color: "var(--white)"}}>
-                  {avisList.length} {avisList.length > 1 ? "avis" : "avis"}
-                </span>
-              </div>
-              <div className="card-body p-4">
-                {avisList.length > 0 ? (
-                  <div className="reviews-list">
-                    {avisList.map((avis, i) => (
-                      <div key={i} className={`review-item p-3 ${i !== avisList.length - 1 ? "border-bottom" : ""}`}>
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <div className="stars">
-                            {[...Array(5)].map((_, index) => (
-                              <i key={index} className={`bi bi-star-fill ${index < avis.note ? "text-warning" : "text-muted"}`}></i>
-                            ))}
-                            <span className="ms-2 fw-bold">{avis.note}/5</span>
-                          </div>
-                          <small className="text-muted">
-                            <i className="bi bi-calendar me-1"></i> {avis.date}
-                          </small>
-                        </div>
-                        <p className="mb-0">{avis.commentaire}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <i className="bi bi-chat-dots display-5 text-muted mb-3"></i>
-                    <p className="text-muted">Aucun avis pour ce cours. Soyez le premier à donner votre opinion !</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Submit Review Form */}
-            <div className="card border-0 shadow-sm rounded-lg mb-4">
-              <div className="card-header border-0 py-3" style={{background: "var(--white)"}}>
-                <h5 className="m-0 fw-bold">
-                  <i className="bi bi-pencil-square me-2" style={{color: "var(--primary-color)"}}></i>
-                  Donnez votre avis
-                </h5>
-              </div>
-              <div className="card-body p-4">
-                <form onSubmit={handleSubmitReview}>
-                  <div className="mb-4">
-                    <label className="form-label fw-medium">Note</label>
-                    <div className="rating-select d-flex gap-2">
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <button 
-                          key={n} 
-                          type="button"
-                          className={`btn ${formData.note == n ? 'btn-warning' : 'btn-outline-warning'}`}
-                          style={{borderRadius: "var(--border-radius-sm)"}}
-                          onClick={() => setFormData({ ...formData, note: n })}
-                        >
-                          {n} <i className="bi bi-star-fill ms-1"></i>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <label className="form-label fw-medium">Commentaire</label>
-                    <textarea
-                      className="form-control"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        background: "var(--input-bg)"
-                      }}
-                      rows="4"
-                      placeholder="Partagez votre expérience avec ce cours..."
-                      value={formData.commentaire}
-                      onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })}
-                      required
-                    ></textarea>
-                  </div>
-                  <div className="d-grid">
-                    <button 
-                      type="submit" 
-                      className="btn py-2"
-                      style={{
-                        background: "var(--primary-color)",
-                        color: "var(--white)",
-                        borderRadius: "var(--border-radius-lg)"
-                      }}
-                    >
-                      <i className="bi bi-send me-2"></i> Soumettre mon avis
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-          
-          {/* Right Column */}
-          <div className="col-lg-4">
-            {/* Actions Card */}
-            <div className="card border-0 shadow-sm rounded-lg mb-4 sticky-top" style={{
-              borderRadius: "var(--border-radius-sm)",
-              top: "100px"
-            }}>
-              <div className="card-header border-0 py-3" style={{background: "var(--white)"}}>
-                <h5 className="m-0 fw-bold">
-                  <i className="bi bi-gear me-2" style={{color: "var(--primary-color)"}}></i>
-                  Actions
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="d-grid gap-3">
-                  <button
-                    className={`btn ${isFavorite ? "btn-warning" : "btn-outline-warning"}`}
-                    style={{borderRadius: "var(--border-radius-lg)"}}
-                    onClick={handleToggleFavorite}
-                  >
-                    <i className={`bi ${isFavorite ? 'bi-star-fill' : 'bi-star'} me-2`}></i>
-                    {isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
-                  </button>
-                  
-                  <Link to="/dashboard" className="btn btn-outline-primary" style={{borderRadius: "var(--border-radius-lg)"}}>
-                    <i className="bi bi-speedometer2 me-2"></i> Tableau de bord
-                  </Link>
-                  
-                  {admin && (
-                    <>
-                      <Link to={`/admin/modifier/${course.id_cours}`} className="btn btn-outline-success" style={{borderRadius: "var(--border-radius-lg)"}}>
-                        <i className="bi bi-pencil me-2"></i> Modifier le cours
-                      </Link>
-                      <button onClick={handleDelete} className="btn btn-outline-danger" style={{borderRadius: "var(--border-radius-lg)"}}>
-                        <i className="bi bi-trash me-2"></i> Supprimer le cours
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+            </div>*/}
             
-            {/* Course Info Card */}
+            {/* Course Details Card - New Section */}
             <div className="card border-0 shadow-sm rounded-lg mb-4">
               <div className="card-header border-0 py-3" style={{background: "var(--white)"}}>
                 <h5 className="m-0 fw-bold">
                   <i className="bi bi-info-circle me-2" style={{color: "var(--primary-color)"}}></i>
-                  Informations
+                  Informations détaillées
                 </h5>
               </div>
               <div className="card-body">
-                <ul className="list-group list-group-flush">
+                <div className="row g-4">
                   {[
                     { icon: "bi-tag", label: "Domaine", value: course.domaine },
                     { icon: "bi-file-earmark", label: "Type", value: course.type_ressource },
                     { icon: "bi-bar-chart", label: "Niveau", value: course.niveau },
-                    { icon: "bi-globe", label: "Langue", value: course.langue },
-                    { icon: "bi-eye", label: "Vues", value: course.nombre_vues }
+                    { icon: "bi-globe", label: "Langue", value: course.langue }
                   ].map((item, index) => (
-                    <li key={index} className="list-group-item px-0 py-3 d-flex justify-content-between align-items-center border-bottom">
-                      <div>
-                        <i className={`${item.icon} me-2`} style={{color: "var(--primary-color)"}}></i>
-                        {item.label}
+                    <div key={index} className="col-md-3 col-6">
+                      <div className="p-3 rounded-lg text-center h-100" style={{
+                        background: "rgba(var(--primary-rgb), 0.05)",
+                        border: "1px solid rgba(var(--primary-rgb), 0.1)"
+                      }}>
+                        <div className="mb-2">
+                          <i className={`${item.icon}`} style={{
+                            fontSize: "1.75rem", 
+                            color: "var(--primary-color)"
+                          }}></i>
+                        </div>
+                        <div className="fw-bold mb-1">{item.label}</div>
+                        <div>{item.value}</div>
                       </div>
-                      <span className="badge" style={{background: "var(--accent-bg)", color: "var(--text-dark)"}}>{item.value}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            
-            {/* Share Card */}
-            <div className="card border-0 shadow-sm rounded-lg mb-4">
-              <div className="card-header border-0 py-3" style={{background: "var(--white)"}}>
-                <h5 className="m-0 fw-bold">
-                  <i className="bi bi-share me-2" style={{color: "var(--primary-color)"}}></i>
-                  Partager
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="d-flex justify-content-between">
-                  {[
-                    { icon: "bi-facebook", color: "#1877f2" },
-                    { icon: "bi-twitter", color: "#1da1f2" },
-                    { icon: "bi-linkedin", color: "#0077b5" },
-                    { icon: "bi-envelope", color: "#ea4335" },
-                    { icon: "bi-link-45deg", color: "#6c757d" }
-                  ].map((item, index) => (
-                    <button 
-                      key={index} 
-                      className="btn btn-icon"
-                      style={{width: "40px", height: "40px", borderRadius: "50%", color: item.color, background: `rgba(${parseInt(item.color.slice(1, 3), 16)}, ${parseInt(item.color.slice(3, 5), 16)}, ${parseInt(item.color.slice(5, 7), 16)}, 0.1)`}}
-                    >
-                      <i className={item.icon}></i>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
             </div>
+            
+            {/* Reviews Toggle Button */}
+            <div className="card border-0 shadow-sm rounded-lg mb-4">
+              <div className="card-body p-3">
+                <div className="d-flex justify-content-between align-items-center">
+                  <div className="d-flex align-items-center">
+                    <i className="bi bi-chat-quote me-2" style={{color: "var(--primary-color)", fontSize: "1.25rem"}}></i>
+                    <span className="fw-medium">Avis des utilisateurs</span>
+                    <span className="badge rounded-pill ms-2" style={{background: "var(--primary-color)", color: "var(--white)"}}>
+                      {avisList.length}
+                    </span>
+                  </div>
+                  <div>
+                    <button 
+                      className="btn btn-outline-primary me-2" 
+                      onClick={() => setShowReviews(!showReviews)}
+                      style={{borderRadius: "var(--border-radius-lg)"}}
+                    >
+                      <i className={`bi ${showReviews ? 'bi-eye-slash' : 'bi-eye'} me-2`}></i>
+                      {showReviews ? "Masquer les commentaires" : "Voir les commentaires"}
+                    </button>
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={() => setShowReviewForm(!showReviewForm)}
+                      style={{borderRadius: "var(--border-radius-lg)"}}
+                    >
+                      <i className="bi bi-pencil-square me-2"></i>
+                      Donner mon avis
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Reviews Section - Conditionally Displayed */}
+            {showReviews && (
+              <div className="card border-0 shadow-sm rounded-lg mb-4">
+                <div className="card-body p-4">
+                  {avisList.length > 0 ? (
+                    <div className="reviews-list">
+                      {avisList.map((avis, i) => (
+                        <div key={i} className={`review-item p-3 ${i !== avisList.length - 1 ? "border-bottom" : ""}`}>
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <div className="stars">
+                              {[...Array(5)].map((_, index) => (
+                                <i key={index} className={`bi bi-star-fill ${index < avis.note ? "text-warning" : "text-muted"}`}></i>
+                              ))}
+                              <span className="ms-2 fw-bold">{avis.note}/5</span>
+                            </div>
+                            <small className="text-muted">
+                              <i className="bi bi-calendar me-1"></i> {avis.date}
+                            </small>
+                          </div>
+                          <p className="mb-0">{avis.commentaire}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <i className="bi bi-chat-dots display-5 text-muted mb-3"></i>
+                      <p className="text-muted">Aucun avis pour ce cours. Soyez le premier à donner votre opinion !</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Submit Review Form - Conditionally Displayed */}
+            {showReviewForm && (
+              <div className="card border-0 shadow-sm rounded-lg mb-4">
+                <div className="card-header border-0 py-3" style={{background: "var(--white)"}}>
+                  <h5 className="m-0 fw-bold">
+                    <i className="bi bi-pencil-square me-2" style={{color: "var(--primary-color)"}}></i>
+                    Donnez votre avis
+                  </h5>
+                </div>
+                <div className="card-body p-4">
+                  <form onSubmit={handleSubmitReview}>
+                    <div className="mb-4">
+                      <label className="form-label fw-medium">Note</label>
+                      <div className="rating-select d-flex gap-2">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button 
+                            key={n} 
+                            type="button"
+                            className={`btn ${formData.note == n ? 'btn-warning' : 'btn-outline-warning'}`}
+                            style={{borderRadius: "var(--border-radius-sm)"}}
+                            onClick={() => setFormData({ ...formData, note: n })}
+                          >
+                            {n} <i className="bi bi-star-fill ms-1"></i>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <label className="form-label fw-medium">Commentaire</label>
+                      <textarea
+                        className="form-control"
+                        style={{
+                          borderRadius: "var(--border-radius-sm)",
+                          background: "var(--input-bg)"
+                        }}
+                        rows="4"
+                        placeholder="Partagez votre expérience avec ce cours..."
+                        value={formData.commentaire}
+                        onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })}
+                        required
+                      ></textarea>
+                    </div>
+                    <div className="d-grid">
+                      <button 
+                        type="submit" 
+                        className="btn py-2"
+                        style={{
+                          background: "var(--primary-color)",
+                          color: "var(--white)",
+                          borderRadius: "var(--border-radius-lg)"
+                        }}
+                      >
+                        <i className="bi bi-send me-2"></i> Soumettre mon avis
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+            
+            <div className="d-flex justify-content-between mb-5">
+              <Link to="/dashboard" className="btn btn-outline-primary" style={{borderRadius: "var(--border-radius-lg)"}}>
+                <i className="bi bi-arrow-left me-2"></i> Retour au dashboard
+              </Link>
+              <a href="#top" className="btn" style={{
+                width: "40px", 
+                height: "40px", 
+                borderRadius: "50%",
+                background: "var(--white)",
+                boxShadow: "var(--shadow)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}>
+                <i className="bi bi-arrow-up"></i>
+              </a>
+            </div>
           </div>
-        </div>
-        
-        <div className="d-flex justify-content-between mb-5">
-          <Link to="/dashboard" className="btn btn-outline-primary" style={{borderRadius: "var(--border-radius-lg)"}}>
-            <i className="bi bi-arrow-left me-2"></i> Retour au dashboard
-          </Link>
-          <a href="#top" className="btn" style={{
-            width: "40px", 
-            height: "40px", 
-            borderRadius: "50%",
-            background: "var(--white)",
-            boxShadow: "var(--shadow)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}>
-            <i className="bi bi-arrow-up"></i>
-          </a>
         </div>
       </div>
       

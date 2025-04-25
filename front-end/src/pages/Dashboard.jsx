@@ -255,7 +255,6 @@ const Dashboard = () => {
           <div className="col-lg-8">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h4 className="m-0">
-                <i className="bi bi-stars text-warning me-2"></i>
                 {search || domaine || type || niveau ? "Résultats de recherche" : "Cours recommandés pour vous"}
               </h4>
               <span className="badge rounded-pill" style={{background: "var(--primary-color)", color: "var(--white)"}}>{recommandations.length} cours</span>
@@ -347,28 +346,31 @@ const Dashboard = () => {
                 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <nav className="mt-5 d-flex justify-content-center">
+                  <nav className="mt-5 d-flex justify-content-center align-items-center">
                     <ul className="pagination">
                       <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={() => paginate(currentPage - 1)}>
+                        <button 
+                          className="page-link" 
+                          onClick={() => paginate(currentPage - 1)}
+                          disabled={currentPage === 1}
+                        >
                           <i className="bi bi-chevron-left"></i>
                         </button>
                       </li>
                       
-                      {[...Array(totalPages).keys()].map(number => (
-                        <li key={number + 1} className={`page-item ${currentPage === number + 1 ? 'active' : ''}`}>
-                          <button 
-                            className="page-link" 
-                            onClick={() => paginate(number + 1)}
-                            style={currentPage === number + 1 ? {background: "var(--primary-color)", borderColor: "var(--primary-color)"} : {}}
-                          >
-                            {number + 1}
-                          </button>
-                        </li>
-                      ))}
+                      {/* Indicateur de page actuelle (optionnel) */}
+                      <li className="mx-3">
+                        <span style={{color: "var(--text-dark)"}}>
+                          {currentPage} / {totalPages}
+                        </span>
+                      </li>
                       
                       <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                        <button className="page-link" onClick={() => paginate(currentPage + 1)}>
+                        <button 
+                          className="page-link" 
+                          onClick={() => paginate(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                        >
                           <i className="bi bi-chevron-right"></i>
                         </button>
                       </li>
@@ -387,12 +389,12 @@ const Dashboard = () => {
           <div className="row">
             <div className="col-md-6">
               <h5 className="fw-bold mb-3">
-                <i className="bi bi-lightning-charge-fill me-2"></i>DevStorm
+                <i className="bi bi-lightning-charge-fill me-2"></i>DocStorm
               </h5>
               <p style={{color: "var(--text-light)"}}>Plateforme mondiale d'éducation et de formation en ligne.</p>
             </div>
             <div className="col-md-6 text-md-end">
-              <p className="mb-0" style={{color: "var(--text-light)"}}>© 2025 DevStorm. Tous droits réservés.</p>
+              <p className="mb-0" style={{color: "var(--text-light)"}}>© 2025 DocStorm. Tous droits réservés.</p>
             </div>
           </div>
         </div>

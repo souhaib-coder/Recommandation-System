@@ -1,14 +1,22 @@
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, IntegerField, SubmitField, TextAreaField, FileField
 from wtforms.validators import DataRequired, Optional, NumberRange
-from sqlalchemy import func, desc
 
-from Models import db,Cours, Favoris,Utilisateurs, Historique_Consultation, Profils_Utilisateurs, Avis,app,datetime,timezone
+from Models import db,Cours, Favoris,Utilisateurs, Historique_Consultation, Profils_Utilisateurs, Avis,app
 from security import *
+
+from security import admin_required
+from sqlalchemy import func, desc, asc, case, extract
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import io
+import base64
+from datetime import datetime, timedelta, timezone
 
 #from recommendations import hybrid_recommendations
 
@@ -128,7 +136,7 @@ def search_cours():
     else:
         # Si aucun filtre, renvoyer les recommandations
         cours_list = cours_recommandes(user_id)
-        return jsonify(cours_list)
+        return jsonify(cours_list), 200
 
     return jsonify([{
             "id_cours": cours.id_cours,
@@ -141,6 +149,39 @@ def search_cours():
             "chemin_source": cours.chemin_source,
             "nombre_vues": cours.nombre_vues,
         } for cours in cours_list]), 200
+##########
+@courses_bp.route('/api/admin/cours', methods=['GET'])
+@login_required
+@admin_required
+def AdminCours():
+
+    # Récupérer les paramètres de la requête
+    search = request.args.get('search', '')
+    domaine = request.args.get('domaine', '')
+   
+    query = db.session.query(Cours)
+    cours_list = []
+
+    # Appliquer les filtres si des paramètres sont présents
+    if search or domaine:
+        if search:
+            query = query.filter(Cours.nom.ilike(f"%{search}%"))
+        if domaine:
+            query = query.filter(Cours.domaine == domaine)
+    cours_list = query.all()
+    
+    return jsonify([{
+            "id_cours": cours.id_cours,
+            "nom": cours.nom,
+            "domaine": cours.domaine,
+            "type_ressource": cours.type_ressource,
+            "niveau": cours.niveau,
+            "langue": cours.langue,
+            "objectifs": cours.objectifs,
+            "chemin_source": cours.chemin_source,
+            "nombre_vues": cours.nombre_vues,
+        } for cours in cours_list]), 200
+
 
 #######
 @courses_bp.route('/api/cours/details/<int:id_cours>', methods=['GET', 'POST'])
@@ -381,7 +422,6 @@ def supprimer_cours(id_cours):
 
 ####
 
-
 @courses_bp.route('/api/cours/avis/<int:id_cours>', methods=['GET', 'POST'])
 @login_required
 def ajouter_avis(id_cours):
@@ -390,47 +430,62 @@ def ajouter_avis(id_cours):
     user_id = current_user.id_user
     message = ""
     
-    # Check if this is an API request
-    if request.method == 'POST':
-        if request.is_json:
-            form_data = request.get_json()
-            form = AvisForm(data=form_data)
-        
-        if form.validate_on_submit():
-            note = form.note.data
-            commentaire = form.commentaire.data.strip()
+    # Check if this is a direct route call (API request)
+    if request.path.startswith('/api/cours/avis/'):
+        if request.method == 'POST':
+            if request.is_json:
+                form_data = request.get_json()
+                form = AvisForm(data=form_data)
             
-            avis_existant = Avis.query.filter_by(user_id=user_id, cours_id=id_cours).first()
-            
-            if avis_existant:
-                if avis_existant.note != note:
-                    avis_existant.note = note
-                    message += "Votre note a été mise à jour. "
+            if form.validate_on_submit():
+                note = form.note.data
+                commentaire = form.commentaire.data.strip()
                 
-                if commentaire:
+                avis_existant = Avis.query.filter_by(user_id=user_id, cours_id=id_cours).first()
+                
+                if avis_existant:
+                    if avis_existant.note != note:
+                        avis_existant.note = note
+                        message += "Votre note a été mise à jour. "
+                    
+                    if commentaire:
+                        nouvel_avis = Avis(
+                            user_id=user_id,
+                            cours_id=id_cours,
+                            note=avis_existant.note,
+                            commentaire=commentaire
+                        )
+                        db.session.add(nouvel_avis)
+                        message += "Commentaire ajouté."
+                else:
                     nouvel_avis = Avis(
                         user_id=user_id,
                         cours_id=id_cours,
-                        note=avis_existant.note,
-                        commentaire=commentaire
+                        note=note,
+                        commentaire=commentaire if commentaire else None
                     )
                     db.session.add(nouvel_avis)
-                    message += "Commentaire ajouté."
-            else:
-                nouvel_avis = Avis(
-                    user_id=user_id,
-                    cours_id=id_cours,
-                    note=note,
-                    commentaire=commentaire if commentaire else None
-                )
-                db.session.add(nouvel_avis)
-                message = "Votre avis a été enregistré avec succès."
-            
-            db.session.commit()
-            return jsonify({"message": message}), 201
-        return jsonify({"errors": form.errors}), 400
+                    message = "Votre avis a été enregistré avec succès."
+                
+                db.session.commit()
+                return jsonify({"message": message}), 201
+            return jsonify({"errors": form.errors}), 400
+        
+        # If GET request to API endpoint, return form structure
+        form_schema = {
+            'note': {
+                'label': form.note.label.text,
+                'type': 'select',
+                'choices': form.note.choices
+            },
+            'commentaire': {
+                'label': form.commentaire.label.text,
+                'type': 'textarea'
+            }
+        }
+        return jsonify({"form": form_schema}), 200
     
-    # If this function is called directly (not as a route handler)
+    # If this function is called from another function (not directly as a route)
     return form
 
 def enregistrer_consultation(id_user, id_cours, titre_cours):
@@ -571,3 +626,305 @@ def dashboard():
             "moyenne_note": moyenne_note,
             "score": score
         })'''
+
+
+######################################################ADMIN
+
+
+# Routes pour le tableau de bord administrateur
+
+@courses_bp.route('/api/admin/stats', methods=['GET'])
+@login_required
+@admin_required
+def admin_stats():
+    """Récupère les statistiques générales pour le dashboard administrateur"""
+    
+    # Calculer le nombre total d'utilisateurs
+    total_users = Utilisateurs.query.count()
+    
+    # Calculer le nombre total de cours
+    total_courses = Cours.query.count()
+    
+    # Calculer le nombre de vues aujourd'hui
+    aujourd_hui = datetime.now(timezone.utc).date()
+    views_today = Historique_Consultation.query.filter(
+        func.date(Historique_Consultation.date_consultation) == aujourd_hui
+    ).count()
+    
+    # Calculer le nombre de nouveaux utilisateurs dans les 7 derniers jours
+    semaine_derniere = aujourd_hui - timedelta(days=7)
+    new_users_last_week = Utilisateurs.query.filter(
+        func.date(Utilisateurs.date_inscription) >= semaine_derniere
+    ).count()
+    
+    # Distribution par type de ressource
+    resource_types = db.session.query(
+        Cours.type_ressource.label('name'),
+        func.count(Cours.id_cours).label('value')
+    ).group_by(Cours.type_ressource).all()
+    
+    resource_type_distribution = [{'name': rt.name, 'value': rt.value} for rt in resource_types]
+    
+    # Distribution par domaine
+    domains = db.session.query(
+        Cours.domaine.label('name'),
+        func.count(Cours.id_cours).label('value')
+    ).group_by(Cours.domaine).all()
+    
+    domain_distribution = [{'name': d.name, 'value': d.value} for d in domains]
+    
+    return jsonify({
+        'totalUsers': total_users,
+        'totalCourses': total_courses,
+        'viewsToday': views_today,
+        'newUsersLastWeek': new_users_last_week,
+        'resourceTypeDistribution': resource_type_distribution,
+        'domainDistribution': domain_distribution
+    }), 200
+
+
+@courses_bp.route('/api/admin/top-courses', methods=['GET'])
+@login_required
+@admin_required
+def top_courses():
+    """Récupère les 10 cours les plus consultés avec statistiques détaillées"""
+    
+    # Import distinct si nécessaire
+    from sqlalchemy import distinct
+    
+    top_courses = db.session.query(
+        Cours,
+        func.coalesce(func.avg(Avis.note), 0).label('moyenne_note'),
+        func.count(distinct(Favoris.id_favoris)).label('nombre_favoris')
+    ).outerjoin(
+        Avis, Cours.id_cours == Avis.cours_id
+    ).outerjoin(
+        Favoris, Cours.id_cours == Favoris.cours_id
+    ).group_by(
+        Cours.id_cours
+    ).order_by(
+        desc(Cours.nombre_vues)
+    ).limit(10).all()
+    
+    result = [{
+        'id_cours': course.id_cours,
+        'nom': course.nom,
+        'domaine': course.domaine,
+        'type_ressource': course.type_ressource,
+        'niveau': course.niveau,
+        'nombre_vues': course.nombre_vues,
+        'moyenne_note': float(moyenne_note),
+        'nombre_favoris': nombre_favoris
+    } for course, moyenne_note, nombre_favoris in top_courses]
+    
+    return jsonify(result), 200
+
+
+@courses_bp.route('/api/admin/courses-activity', methods=['GET'])
+@login_required
+@admin_required
+def courses_activity():
+    """Récupère l'activité des cours (consultations et favoris) sur une période donnée"""
+    
+    time_frame = request.args.get('timeFrame', 'week')
+    today = datetime.now(timezone.utc).date()
+    
+    if time_frame == 'week':
+        days = 7
+        format_str = '%Y-%m-%d'  # Format quotidien
+    elif time_frame == 'month':
+        days = 30
+        format_str = '%Y-%m-%d'  # Format quotidien
+    else:  # year
+        days = 365
+        format_str = '%Y-%m'  # Format mensuel
+    
+    start_date = today - timedelta(days=days)
+    
+    # Vérifier si l'attribut date_ajout existe dans la classe Favoris
+    has_date_ajout = hasattr(Favoris, 'date_ajout')
+    
+    if time_frame in ['week', 'month']:
+        # Activité quotidienne
+        consultations = db.session.query(
+            func.date(Historique_Consultation.date_consultation).label('date'),
+            func.count().label('count')
+        ).filter(
+            func.date(Historique_Consultation.date_consultation) >= start_date
+        ).group_by(
+            func.date(Historique_Consultation.date_consultation)
+        ).all()
+        
+        if has_date_ajout:
+            favoris = db.session.query(
+                func.date(Favoris.date_ajout).label('date'),
+                func.count().label('count')
+            ).filter(
+                func.date(Favoris.date_ajout) >= start_date
+            ).group_by(
+                func.date(Favoris.date_ajout)
+            ).all()
+        else:
+            # Utiliser une valeur par défaut si date_ajout n'existe pas
+            favoris = []
+        
+    else:
+        # Activité mensuelle
+        consultations = db.session.query(
+            func.strftime('%Y-%m', Historique_Consultation.date_consultation).label('date'),
+            func.count().label('count')
+        ).filter(
+            func.date(Historique_Consultation.date_consultation) >= start_date
+        ).group_by(
+            func.strftime('%Y-%m', Historique_Consultation.date_consultation)
+        ).all()
+        
+        if has_date_ajout:
+            favoris = db.session.query(
+                func.strftime('%Y-%m', Favoris.date_ajout).label('date'),
+                func.count().label('count')
+            ).filter(
+                func.date(Favoris.date_ajout) >= start_date
+            ).group_by(
+                func.strftime('%Y-%m', Favoris.date_ajout)
+            ).all()
+        else:
+            favoris = []
+    
+    # Créer une liste de dates pour l'intervalle
+    date_list = []
+    current_date = start_date
+    
+    while current_date <= today:
+        if time_frame in ['week', 'month']:
+            date_list.append(current_date.strftime(format_str))
+            current_date += timedelta(days=1)
+        else:
+            date_list.append(current_date.strftime(format_str))
+            # Avancer d'un mois
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1)
+    
+    # Convertir les résultats de requête en dictionnaires pour faciliter la recherche
+    consultations_dict = {str(c.date): c.count for c in consultations}
+    favoris_dict = {str(f.date): f.count for f in favoris} if favoris else {}
+    
+    # Créer la structure de données finale
+    activity_data = []
+    for date_str in date_list:
+        activity_data.append({
+            'date': date_str,
+            'consultations': consultations_dict.get(date_str, 0),
+            'favoris': favoris_dict.get(date_str, 0)
+        })
+    
+    return jsonify(activity_data), 200
+
+
+@courses_bp.route('/api/admin/users-activity', methods=['GET'])
+@login_required
+@admin_required
+def users_activity():
+    """Récupère l'activité des utilisateurs sur une période donnée"""
+    
+    # Import distinct si nécessaire
+    from sqlalchemy import distinct
+    
+    time_frame = request.args.get('timeFrame', 'week')
+    today = datetime.now(timezone.utc).date()
+    
+    if time_frame == 'week':
+        days = 7
+        format_str = '%Y-%m-%d'  # Format quotidien
+    elif time_frame == 'month':
+        days = 30
+        format_str = '%Y-%m-%d'  # Format quotidien
+    else:  # year
+        days = 365
+        format_str = '%Y-%m'  # Format mensuel
+    
+    start_date = today - timedelta(days=days)
+    
+    # Vérifier si l'attribut date_inscription existe dans la classe Utilisateurs
+    has_date_inscription = hasattr(Utilisateurs, 'date_inscription')
+    
+    if time_frame in ['week', 'month']:
+        # Nouveaux utilisateurs par jour
+        if has_date_inscription:
+            nouveaux_utilisateurs = db.session.query(
+                func.date(Utilisateurs.date_inscription).label('date'),
+                func.count().label('count')
+            ).filter(
+                func.date(Utilisateurs.date_inscription) >= start_date
+            ).group_by(
+                func.date(Utilisateurs.date_inscription)
+            ).all()
+        else:
+            nouveaux_utilisateurs = []
+        
+        # Utilisateurs actifs par jour (ceux qui ont consulté au moins un cours)
+        utilisateurs_actifs = db.session.query(
+            func.date(Historique_Consultation.date_consultation).label('date'),
+            func.count(distinct(Historique_Consultation.user_id)).label('count')
+        ).filter(
+            func.date(Historique_Consultation.date_consultation) >= start_date
+        ).group_by(
+            func.date(Historique_Consultation.date_consultation)
+        ).all()
+        
+    else:
+        # Nouveaux utilisateurs par mois
+        if has_date_inscription:
+            nouveaux_utilisateurs = db.session.query(
+                func.strftime('%Y-%m', Utilisateurs.date_inscription).label('date'),
+                func.count().label('count')
+            ).filter(
+                func.date(Utilisateurs.date_inscription) >= start_date
+            ).group_by(
+                func.strftime('%Y-%m', Utilisateurs.date_inscription)
+            ).all()
+        else:
+            nouveaux_utilisateurs = []
+        
+        # Utilisateurs actifs par mois
+        utilisateurs_actifs = db.session.query(
+            func.strftime('%Y-%m', Historique_Consultation.date_consultation).label('date'),
+            func.count(distinct(Historique_Consultation.user_id)).label('count')
+        ).filter(
+            func.date(Historique_Consultation.date_consultation) >= start_date
+        ).group_by(
+            func.strftime('%Y-%m', Historique_Consultation.date_consultation)
+        ).all()
+    
+    # Créer une liste de dates pour l'intervalle
+    date_list = []
+    current_date = start_date
+    
+    while current_date <= today:
+        if time_frame in ['week', 'month']:
+            date_list.append(current_date.strftime(format_str))
+            current_date += timedelta(days=1)
+        else:
+            date_list.append(current_date.strftime(format_str))
+            # Avancer d'un mois
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1)
+    
+    # Convertir les résultats de requête en dictionnaires pour faciliter la recherche
+    nouveaux_dict = {str(nu.date): nu.count for nu in nouveaux_utilisateurs} if nouveaux_utilisateurs else {}
+    actifs_dict = {str(ua.date): ua.count for ua in utilisateurs_actifs}
+    
+    # Créer la structure de données finale
+    activity_data = []
+    for date_str in date_list:
+        activity_data.append({
+            'date': date_str,
+            'nouveauxUtilisateurs': nouveaux_dict.get(date_str, 0),
+            'utilisateursActifs': actifs_dict.get(date_str, 0)
+        })
+    
+    return jsonify(activity_data), 200
