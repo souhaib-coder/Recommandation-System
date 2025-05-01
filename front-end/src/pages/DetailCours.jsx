@@ -89,17 +89,22 @@ const DetailCours = () => {
     try {
       const response = await submitReview(id, formData);
       setMessage(response.message || "Avis soumis avec succès !");
+        
+      // Créer un nouvel avis avec les données du formulaire et la date actuelle
+      const today = new Date();
+      const formattedDate = today.toLocaleDateString('fr-FR');
       
-      // If the response includes a new review, add it to the list
-      if (response.id) {
-        setAvisList((prev) => [...prev, {
-          id: response.id,
-          utilisateur: response.utilisateur,
-          note: response.note,
-          commentaire: response.commentaire,
-          date: response.date
-        }]);
-      }
+      const newReview = {
+        id: response.id || Date.now(),
+        utilisateur: "Vous", // Assumer que c'est l'utilisateur actuel
+        note: formData.note,
+        commentaire: formData.commentaire,
+        date: formattedDate
+      };
+      
+      // Mettre à jour la liste des avis et assurer qu'elle est affichée
+      setAvisList(prev => [...prev, newReview]);
+      setShowReviews(true); // Forcer l'affichage des avis
       
       setFormData({ note: 5, commentaire: "" });
       setShowReviewForm(false);

@@ -4,24 +4,39 @@ import { PlusCircle, Edit, Trash2, XCircle, Save, Eye, Book, FileText } from 'lu
 import AdminNavbar from './navbars/AdminNavbar';
 
 const AdminCourses = () => {
+
+  const initialFormState = {
+    nom: '',
+    type_ressource: 'Cours',
+    domaine: 'Informatique',
+    langue: 'Français',
+    niveau: 'Débutant',
+    objectifs: 'Apprentissage',
+    durée: '',
+    type_contenu: 'fichier', // Nouveau champ pour distinguer fichier/lien
+    url_cours: '', // Nouveau champ pour stocker l'URL
+  };
+
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
-  const [formData, setFormData] = useState({
-    nom: '',
-    domaine: '',
-    type_ressource: '', 
-    niveau: '',
-    langue: '',
-    objectifs: '',
-    durée: ''
-  });
+  const [formData, setFormData] = useState(initialFormState);
+
   const [fichierCours, setFichierCours] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDomain, setFilterDomain] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [coursesPerPage] = useState(10);
 
+  
+// Changer de page
+const paginate = (pageNumber) => {
+  if (pageNumber > 0 && pageNumber <= totalPages) {
+    setCurrentPage(pageNumber);
+  }
+};
   // Fonction pour charger tous les cours
   const loadCourses = async () => {
     setLoading(true);
@@ -42,63 +57,122 @@ const AdminCourses = () => {
 
   // Gestionnaire pour la modification des champs du formulaire
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
+  const { name, value } = e.target;
+  setFormData(prevState => ({
+    ...prevState,
+    [name]: value
+  }));
+};
 
   // Gestionnaire pour le téléchargement de fichier
-  const handleFileChange = (e) => {
+  // Gestion du changement de fichier
+const handleFileChange = (e) => {
+  if (e.target.files[0]) {
     setFichierCours(e.target.files[0]);
-  };
+  }
+};
 
   // Fonction pour réinitialiser le formulaire
   const resetForm = () => {
-    setFormData({
-      nom: '',
-      domaine: '',
-      type_ressource: '',
-      niveau: '',
-      langue: '',
-      objectifs: '',
-      durée: ''
-    });
+    setFormData(initialFormState);
     setFichierCours(null);
-    setEditingCourse(null);
+    setError('');
   };
 
+
+  // Fonction pour charger les données d'un cours à modifier
+// Fonction pour charger les données d'un cours à modifier
+const editCourse = (course) => {
+  const isTutorial = course.type_ressource === 'Tutoriel';
+  
+  // Déterminer le type de contenu (lien ou fichier)
+  const isLink = course.chemin_source && 
+                (course.chemin_source.startsWith('http://') || 
+                 course.chemin_source.startsWith('https://'));
+  
+  // Définir le type de contenu correctement
+  const type_contenu = isLink ? 'lien' : 'fichier';
+  
+  // Définir l'URL uniquement si c'est un lien
+  const url_cours = isLink ? course.chemin_source : '';
+  
+  setFormData({
+    nom: course.nom || '',
+    type_ressource: course.type_ressource || 'Cours',
+    domaine: course.domaine || 'Informatique',
+    langue: course.langue || 'Français',
+    niveau: course.niveau || 'Débutant',
+    objectifs: course.objectifs || 'Apprentissage',
+    durée: course.durée || '',
+    type_contenu: type_contenu,
+    url_cours: url_cours,
+  });
+  
+  setEditingCourse(course);
+  setShowAddForm(true);
+  setFichierCours(null); // Réinitialiser le fichier
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
   // Fonction pour soumettre le formulaire (ajouter ou modifier)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const formDataObj = new FormData();
-      Object.keys(formData).forEach(key => {
+  // Fonction pour soumettre le formulaire (ajouter ou modifier)
+// Fonction pour soumettre le formulaire (ajouter ou modifier)
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError(''); // Réinitialiser les erreurs précédentes
+  
+  try {
+    const formDataObj = new FormData();
+    
+    // Déterminer le type de contenu basé sur le type de ressource
+    const isTutorial = formData.type_ressource === 'Tutoriel';
+    
+    // Ajouter tous les champs du formulaire
+    for (const key in formData) {
+      // Ne pas inclure url_cours si ce n'est pas un tutoriel
+      if (!(key === 'url_cours' && !isTutorial)) {
         formDataObj.append(key, formData[key]);
-      });
-      
-      if (fichierCours) {
-        formDataObj.append('fichier_cours', fichierCours);
       }
-
-      if (editingCourse) {
-        // Mode édition
-        await updateCourse(editingCourse.id_cours, formDataObj);
-      } else {
-        // Mode ajout
-        await addCourse(formDataObj);
-      }
-
-      resetForm();
-      setShowAddForm(false);
-      loadCourses(); // Recharger la liste des cours
-    } catch (err) {
-      setError(err.response?.data?.error || "Une erreur est survenue");
-      console.error(err);
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    // Si ce n'est pas un tutoriel et qu'un fichier a été sélectionné, l'ajouter
+    if (!isTutorial && fichierCours) {
+      formDataObj.append('fichier_cours', fichierCours);
+    } else if (!isTutorial && !fichierCours && !editingCourse) {
+      // Si on ajoute un nouveau cours (pas d'édition) et qu'il n'y a pas de fichier
+      setError("Veuillez sélectionner un fichier pour le cours");
+      setLoading(false);
+      return;
+    }
+    
+    // Toujours inclure le type de contenu basé sur le type de ressource
+    formDataObj.append('type_contenu', isTutorial ? 'lien' : 'fichier');
+    
+    // Vérifier que l'URL est renseignée pour les tutoriels
+    if (isTutorial && !formData.url_cours) {
+      setError("Veuillez saisir une URL valide pour le tutoriel");
+      setLoading(false);
+      return;
+    }
+    
+    if (editingCourse) {
+      // Mode édition
+      await updateCourse(editingCourse.id_cours, formDataObj);
+    } else {
+      // Mode ajout
+      await addCourse(formDataObj);
+    }
+    
+    resetForm();
+    setShowAddForm(false);
+    loadCourses(); // Recharger la liste des cours
+  } catch (err) {
+    console.error(err);
+    setError(err.response?.data?.error || err.response?.data?.errors?.fichier_cours || "Une erreur est survenue lors de l'opération");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Fonction pour gérer la suppression d'un cours
   const handleDelete = async (id) => {
@@ -112,22 +186,8 @@ const AdminCourses = () => {
       }
     }
   };
+  
 
-  // Fonction pour préparer l'édition d'un cours
-  const handleEdit = (course) => {
-    setFormData({
-      nom: course.nom,
-      domaine: course.domaine,
-      type_ressource: course.type_ressource,
-      niveau: course.niveau,
-      langue: course.langue,
-      objectifs: course.objectifs,
-      durée: course.durée || ''
-    });
-    setEditingCourse(course);
-    setShowAddForm(true);
-    window.scrollTo(0, 0);
-  };
 
   // Filtrer les cours en fonction du terme de recherche et du domaine
   const filteredCourses = courses.filter(course => {
@@ -135,6 +195,13 @@ const AdminCourses = () => {
     const matchesDomain = filterDomain === '' || course.domaine === filterDomain;
     return matchesSearch && matchesDomain;
   });
+
+  const indexOfLastCourse = currentPage * coursesPerPage;
+  const indexOfFirstCourse = indexOfLastCourse - coursesPerPage;
+  const currentCourses = filteredCourses.slice(indexOfFirstCourse, indexOfLastCourse);
+
+  const totalPages = Math.ceil(filteredCourses.length / coursesPerPage);
+
 
   // Fonction pour obtenir la couleur de badge en fonction du domaine
   const getDomainColor = (domain) => {
@@ -232,229 +299,283 @@ const AdminCourses = () => {
         )}
 
         {/* Formulaire d'ajout/modification */}
-        {showAddForm && (
-          <div className="card border-0 shadow-sm mb-4" style={{borderRadius: "var(--border-radius-sm)"}}>
-            <div className="card-header py-3 bg-transparent">
-              <h5 className="mb-0">
-                <i className="bi bi-journal-plus me-2" style={{color: "var(--primary-color)"}}></i>
-                {editingCourse ? 'Modifier le cours' : 'Ajouter un nouveau cours'}
-              </h5>
-            </div>
-            <div className="card-body">
-              <form onSubmit={handleSubmit}>
-                <div className="row g-3">
-                  <div className="col-md-12">
-                    <label className="form-label">Nom du cours</label>
-                    <input
-                      type="text"
-                      name="nom"
-                      value={formData.nom}
-                      onChange={handleChange}
-                      className="form-control"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid #eaeaea",
-                        padding: "0.625rem 1rem",
-                        background: "var(--input-bg)"
-                      }}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="col-md-6">
-                    <label className="form-label">Domaine</label>
-                    <select
-                      name="domaine"
-                      value={formData.domaine}
-                      onChange={handleChange}
-                      className="form-select"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid #eaeaea",
-                        padding: "0.625rem 1rem",
-                        background: "var(--input-bg)"
-                      }}
-                      required
-                    >
-                      <option value="Informatique">Informatique</option>
-                      <option value="Mathématiques">Mathématiques</option>
-                      <option value="Physique">Physique</option>
-                      <option value="Chimie">Chimie</option>
-                      <option value="Langues">Langues</option>
-                    </select>
-                  </div>
-                  
-                  <div className="col-md-6">
-                    <label className="form-label">Type de ressource</label>
-                    <select
-                      name="type_ressource"
-                      value={formData.type_ressource}
-                      onChange={handleChange}
-                      className="form-select"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid #eaeaea",
-                        padding: "0.625rem 1rem",
-                        background: "var(--input-bg)"
-                      }}
-                      required
-                    >
-                      <option value="Tutoriel">Tutoriel</option>
-                      <option value="Cours">Cours</option>
-                      <option value="Livre">Livre</option>
-                      <option value="TD">TD</option>
-                    </select>
-                  </div>
-                  
-                  <div className="col-md-4">
-                    <label className="form-label">Niveau</label>
-                    <select
-                      name="niveau"
-                      value={formData.niveau}
-                      onChange={handleChange}
-                      className="form-select"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid #eaeaea",
-                        padding: "0.625rem 1rem",
-                        background: "var(--input-bg)"
-                      }}
-                      required
-                    >
-                      <option value="Débutant">Débutant</option>
-                      <option value="Intermédiaire">Intermédiaire</option>
-                      <option value="Avancé">Avancé</option>
-                    </select>
-                  </div>
-                  
-                  <div className="col-md-4">
-                    <label className="form-label">Langue</label>
-                    <select
-                      name="langue"
-                      value={formData.langue}
-                      onChange={handleChange}
-                      className="form-select"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid #eaeaea",
-                        padding: "0.625rem 1rem",
-                        background: "var(--input-bg)"
-                      }}
-                      required
-                    >
-                      <option value="Français">Français</option>
-                      <option value="Anglais">Anglais</option>
-                      <option value="Arabe">Arabe</option>
-                    </select>
-                  </div>
-                  
-                  <div className="col-md-4">
-                    <label className="form-label">Durée (en heures)</label>
-                    <input
-                      type="number"
-                      name="durée"
-                      value={formData.durée}
-                      onChange={handleChange}
-                      className="form-control"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid #eaeaea",
-                        padding: "0.625rem 1rem",
-                        background: "var(--input-bg)"
-                      }}
-                    />
-                  </div>
-                  
-                  <div className="col-md-6">
-                    <label className="form-label">Objectifs</label>
-                    <select
-                      name="objectifs"
-                      value={formData.objectifs}
-                      onChange={handleChange}
-                      className="form-select"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid #eaeaea",
-                        padding: "0.625rem 1rem",
-                        background: "var(--input-bg)"
-                      }}
-                      required
-                    >
-                      <option value="Révision">Révision</option>
-                      <option value="Préparation examen">Préparation examen</option>
-                      <option value="Apprentissage">Apprentissage</option>
-                      <option value="Approfondissement">Approfondissement</option>
-                    </select>
-                  </div>
-                  
-                  <div className="col-md-6">
-                    <label className="form-label">Fichier du cours</label>
-                    <input
-                      type="file"
-                      onChange={handleFileChange}
-                      className="form-control"
-                      style={{
-                        borderRadius: "var(--border-radius-sm)",
-                        border: "1px solid #eaeaea",
-                        padding: "0.625rem 1rem",
-                        background: "var(--input-bg)"
-                      }}
-                      accept=".pdf,.docx,.pptx,.txt"
-                      required={!editingCourse}
-                    />
-                    {editingCourse && (
-                      <p className="form-text text-muted mt-1">
-                        <i className="bi bi-info-circle me-1"></i>
-                        Laissez vide pour conserver le fichier actuel
-                      </p>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="mt-4 d-flex">
-                  <button
-                    type="submit"
-                    className="btn px-4 py-2 me-2"
-                    style={{
-                      background: "var(--primary-color)",
-                      color: "var(--white)",
-                      borderRadius: "var(--border-radius-sm)"
-                    }}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Enregistrement...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={18} className="me-2" />
-                        {editingCourse ? 'Mettre à jour' : 'Ajouter le cours'}
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      resetForm();
-                      setShowAddForm(false);
-                    }}
-                    className="btn px-4 py-2"
-                    style={{
-                      background: "var(--accent-bg)",
-                      color: "var(--text-dark)",
-                      borderRadius: "var(--border-radius-sm)"
-                    }}
-                  >
-                    <XCircle size={18} className="me-2" />
-                    Annuler
-                  </button>
-                </div>
-              </form>
-            </div>
+{showAddForm && (
+  <div className="card border-0 shadow-sm mb-4" style={{borderRadius: "var(--border-radius-sm)"}}>
+    <div className="card-header py-3 bg-transparent">
+      <h5 className="mb-0">
+        <i className="bi bi-journal-plus me-2" style={{color: "var(--primary-color)"}}></i>
+        {editingCourse ? 'Modifier le cours' : 'Ajouter un nouveau cours'}
+      </h5>
+    </div>
+    <div className="card-body">
+      <form onSubmit={handleSubmit}>
+        <div className="row g-3">
+          <div className="col-md-12">
+            <label className="form-label">Nom du cours</label>
+            <input
+              type="text"
+              name="nom"
+              value={formData.nom}
+              onChange={handleChange}
+              className="form-control"
+              style={{
+                borderRadius: "var(--border-radius-sm)",
+                border: "1px solid #eaeaea",
+                padding: "0.625rem 1rem",
+                background: "var(--input-bg)"
+              }}
+              required
+            />
           </div>
-        )}
+          
+          <div className="col-md-6">
+            <label className="form-label">Domaine</label>
+            <select
+              name="domaine"
+              value={formData.domaine}
+              onChange={handleChange}
+              className="form-select"
+              style={{
+                borderRadius: "var(--border-radius-sm)",
+                border: "1px solid #eaeaea",
+                padding: "0.625rem 1rem",
+                background: "var(--input-bg)"
+              }}
+              required
+            >
+              <option value="Informatique">Informatique</option>
+              <option value="Mathématiques">Mathématiques</option>
+              <option value="Physique">Physique</option>
+              <option value="Chimie">Chimie</option>
+              <option value="Langues">Langues</option>
+            </select>
+          </div>
+          
+          <div className="col-md-6">
+            <label className="form-label">Type de ressource</label>
+            <select
+              name="type_ressource"
+              value={formData.type_ressource}
+              onChange={(e) => {
+                // Mettre à jour le type de contenu en fonction du type de ressource
+                const newTypeContenu = e.target.value === 'Tutoriel' ? 'lien' : 'fichier';
+                
+                setFormData(prevState => ({
+                  ...prevState,
+                  type_ressource: e.target.value,
+                  type_contenu: newTypeContenu
+                }));
+              }}
+              className="form-select"
+              style={{
+                borderRadius: "var(--border-radius-sm)",
+                border: "1px solid #eaeaea",
+                padding: "0.625rem 1rem",
+                background: "var(--input-bg)"
+              }}
+              required
+              disabled={editingCourse} // Désactiver le changement de type en mode édition
+            >
+              <option value="Tutoriel">Tutoriel</option>
+              <option value="Cours">Cours</option>
+              <option value="Livre">Livre</option>
+              <option value="TD">TD</option>
+            </select>
+            {editingCourse && (
+              <p className="form-text text-muted mt-1">
+                <i className="bi bi-info-circle me-1"></i>
+                Le type de ressource ne peut pas être modifié
+              </p>
+            )}
+          </div>
+          
+          <div className="col-md-4">
+            <label className="form-label">Niveau</label>
+            <select
+              name="niveau"
+              value={formData.niveau}
+              onChange={handleChange}
+              className="form-select"
+              style={{
+                borderRadius: "var(--border-radius-sm)",
+                border: "1px solid #eaeaea",
+                padding: "0.625rem 1rem",
+                background: "var(--input-bg)"
+              }}
+              required
+            >
+              <option value="Débutant">Débutant</option>
+              <option value="Intermédiaire">Intermédiaire</option>
+              <option value="Avancé">Avancé</option>
+            </select>
+          </div>
+          
+          <div className="col-md-4">
+            <label className="form-label">Langue</label>
+            <select
+              name="langue"
+              value={formData.langue}
+              onChange={handleChange}
+              className="form-select"
+              style={{
+                borderRadius: "var(--border-radius-sm)",
+                border: "1px solid #eaeaea",
+                padding: "0.625rem 1rem",
+                background: "var(--input-bg)"
+              }}
+              required
+            >
+              <option value="Français">Français</option>
+              <option value="Anglais">Anglais</option>
+              <option value="Arabe">Arabe</option>
+            </select>
+          </div>
+          
+          <div className="col-md-4">
+            <label className="form-label">Durée (en heures)</label>
+            <input
+              type="number"
+              name="durée"
+              value={formData.durée}
+              onChange={handleChange}
+              className="form-control"
+              style={{
+                borderRadius: "var(--border-radius-sm)",
+                border: "1px solid #eaeaea",
+                padding: "0.625rem 1rem",
+                background: "var(--input-bg)"
+              }}
+            />
+          </div>
+          
+          <div className="col-md-12">
+            <label className="form-label">Objectifs</label>
+            <select
+              name="objectifs"
+              value={formData.objectifs}
+              onChange={handleChange}
+              className="form-select"
+              style={{
+                borderRadius: "var(--border-radius-sm)",
+                border: "1px solid #eaeaea",
+                padding: "0.625rem 1rem",
+                background: "var(--input-bg)"
+              }}
+              required
+            >
+              <option value="Révision">Révision</option>
+              <option value="Préparation examen">Préparation examen</option>
+              <option value="Apprentissage">Apprentissage</option>
+              <option value="Approfondissement">Approfondissement</option>
+            </select>
+          </div>
+          
+          {/* Champ caché pour stocker le type de contenu */}
+          <input 
+            type="hidden" 
+            name="type_contenu" 
+            value={formData.type_contenu || (formData.type_ressource === 'Tutoriel' ? 'lien' : 'fichier')} 
+          />
+          
+          {/* Affichage conditionnel basé sur le type de ressource */}
+          {formData.type_ressource === 'Tutoriel' ? (
+            <div className="col-md-12">
+              <label className="form-label">URL du tutoriel</label>
+              <input
+                type="url"
+                name="url_cours"
+                value={formData.url_cours || ''}
+                onChange={handleChange}
+                className="form-control"
+                style={{
+                  borderRadius: "var(--border-radius-sm)",
+                  border: "1px solid #eaeaea",
+                  padding: "0.625rem 1rem",
+                  background: "var(--input-bg)"
+                }}
+                placeholder="https://example.com/tutoriel"
+                required
+                // Correction: Simplifier l'expression régulière pour les URL
+                pattern="https?://.+"
+                title="Veuillez entrer une URL valide (commençant par http:// ou https://)"
+              />
+              {editingCourse && (
+                <p className="form-text text-muted mt-1">
+                  <i className="bi bi-info-circle me-1"></i>
+                  Entrez une nouvelle URL pour remplacer l'actuelle
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="col-md-12">
+              <label className="form-label">Fichier du cours</label>
+              <input
+                type="file"
+                onChange={handleFileChange}
+                className="form-control"
+                style={{
+                  borderRadius: "var(--border-radius-sm)",
+                  border: "1px solid #eaeaea",
+                  padding: "0.625rem 1rem",
+                  background: "var(--input-bg)"
+                }}
+                accept=".pdf,.docx,.pptx,.txt"
+                required={!editingCourse}
+              />
+              {editingCourse && (
+                <p className="form-text text-muted mt-1">
+                  <i className="bi bi-info-circle me-1"></i>
+                  Laissez vide pour conserver le fichier actuel
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <div className="mt-4 d-flex">
+          <button
+            type="submit"
+            className="btn px-4 py-2 me-2"
+            style={{
+              background: "var(--primary-color)",
+              color: "var(--white)",
+              borderRadius: "var(--border-radius-sm)"
+            }}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Enregistrement...
+              </>
+            ) : (
+              <>
+                <Save size={18} className="me-2" />
+                {editingCourse ? 'Mettre à jour' : 'Ajouter le cours'}
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              setShowAddForm(false);
+            }}
+            className="btn px-4 py-2"
+            style={{
+              background: "var(--accent-bg)",
+              color: "var(--text-dark)",
+              borderRadius: "var(--border-radius-sm)"
+            }}
+          >
+            <XCircle size={18} className="me-2" />
+            Annuler
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
 
         {/* Filtres et recherche */}
         <div className="card border-0 shadow-sm mb-4" style={{borderRadius: "var(--border-radius-sm)"}}>
@@ -568,7 +689,7 @@ const AdminCourses = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredCourses.map((course) => (
+                    currentCourses.map((course) => (
                       <tr key={course.id_cours}>
                         <td className="py-3 align-middle">{course.id_cours}</td>
                         <td className="py-3 align-middle fw-medium">{course.nom}</td>
@@ -606,7 +727,7 @@ const AdminCourses = () => {
                         <td className="py-3 align-middle text-end">
                           <div className="btn-group">
                             <button
-                              onClick={() => handleEdit(course)}
+                              onClick={() => editCourse(course)}
                               className="btn btn-sm mx-1"
                               style={{
                                 background: "rgba(58, 12, 163, 0.1)",
@@ -637,25 +758,66 @@ const AdminCourses = () => {
             </div>
           </div>
           <div className="card-footer bg-transparent py-3">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <small className="text-muted">Affichage de {filteredCourses.length} cours sur {courses.length} au total</small>
-              </div>
-              <nav aria-label="Page navigation">
-                <ul className="pagination pagination-sm mb-0">
-                  <li className="page-item disabled">
-                    <a className="page-link" href="#" tabIndex="-1" aria-disabled="true">Précédent</a>
-                  </li>
-                  <li className="page-item active"><a className="page-link" href="#">1</a></li>
-                  <li className="page-item"><a className="page-link" href="#">2</a></li>
-                  <li className="page-item"><a className="page-link" href="#">3</a></li>
-                  <li className="page-item">
-                    <a className="page-link" href="#">Suivant</a>
-                  </li>
-                </ul>
-              </nav>
-            </div>
-          </div>
+  <div className="d-flex justify-content-between align-items-center">
+    <div>
+      <small className="text-muted">
+        Affichage de {indexOfFirstCourse + 1}-{Math.min(indexOfLastCourse, filteredCourses.length)} cours sur {filteredCourses.length} au total
+      </small>
+    </div>
+    <nav aria-label="Page navigation">
+      <ul className="pagination pagination-sm mb-0">
+        <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+          <button 
+            className="page-link" 
+            onClick={() => paginate(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            Précédent
+          </button>
+        </li>
+        
+        {/* Générer dynamiquement les numéros de page */}
+        {Array.from({ length: totalPages }, (_, i) => {
+          // Pour limiter le nombre de pages affichées
+          if (
+            i === 0 || // Toujours afficher la première page
+            i === totalPages - 1 || // Toujours afficher la dernière page
+            (i >= currentPage - 2 && i <= currentPage + 0) // Afficher quelques pages autour de la page actuelle
+          ) {
+            return (
+              <li key={i} className={`page-item ${currentPage === i + 1 ? 'active' : ''}`}>
+                <button className="page-link" onClick={() => paginate(i + 1)}>
+                  {i + 1}
+                </button>
+              </li>
+            );
+          }
+          
+          // Afficher des points de suspension pour les pages omises
+          if (i === currentPage + 1 || i === currentPage - 3) {
+            return (
+              <li key={i} className="page-item disabled">
+                <span className="page-link">...</span>
+              </li>
+            );
+          }
+          
+          return null;
+        })}
+        
+        <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+          <button 
+            className="page-link" 
+            onClick={() => paginate(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Suivant
+          </button>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</div>
         </div>
       </div>
       

@@ -1,4 +1,373 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, request, jsonify, render_template
+from flask_login import login_required, current_user, logout_user
+from flask_wtf.csrf import generate_csrf
+from datetime import datetime
+from email_validator import validate_email, EmailNotValidError
+
+from Models import db, Cours, Favoris, Historique_Consultation, Profils_Utilisateurs, Utilisateurs, bcrypt
+
+users_bp = Blueprint('users', __name__)
+
+# API CSRF Token endpoint
+@users_bp.route('/api/csrf-token', methods=['GET'])
+def get_csrf_token():
+    return jsonify({
+        "csrf_token": generate_csrf()
+    })
+
+# API Routes pour le frontend React
+
+@users_bp.route('/api/user/profile', methods=['GET'])
+@login_required
+def get_user_profile():
+    try:
+        print(">> Profil demandé par:", current_user.email)
+
+        profil = Profils_Utilisateurs.query.filter_by(user_id=current_user.id_user).first()
+
+        # 🔐 Gérer date_inscription même si c'est une string
+        raw_date = current_user.date_inscription
+        try:
+            if isinstance(raw_date, str):
+                parsed_date = datetime.fromisoformat(raw_date)
+            else:
+                parsed_date = raw_date
+        except Exception as e:
+            print(">> Impossible de parser la date :", raw_date, e)
+            parsed_date = None
+
+        user_data = {
+            'id_user': current_user.id_user,
+            'nom': current_user.nom,
+            'prenom': current_user.prenom,
+            'email': current_user.email,
+            'date_inscription': parsed_date.isoformat() if parsed_date else None,
+            'admin': current_user.rôle == "admin" if hasattr(current_user, 'rôle') else False
+        }
+
+        profil_data = None
+        if profil:
+            # Gérer date_mise_à_jour de la même manière que date_inscription
+            raw_update_date = profil.date_mise_à_jour
+            try:
+                if isinstance(raw_update_date, str):
+                    parsed_update_date = raw_update_date
+                else:
+                    parsed_update_date = raw_update_date.isoformat() if raw_update_date else None
+            except Exception as e:
+                print(">> Impossible de parser la date de mise à jour:", raw_update_date, e)
+                parsed_update_date = None
+                
+            profil_data = {
+                'domaine_intérêt': profil.domaine_intérêt,
+                'objectifs': profil.objectifs,
+                'date_mise_à_jour': parsed_update_date
+            }
+
+        response = jsonify({'user': user_data, 'profil': profil_data})
+        response.headers['Content-Type'] = 'application/json'
+        return response, 200
+
+    except Exception as e:
+        print(">> ERREUR PROFIL:", e)
+        return jsonify({'error': str(e)}), 500
+
+@users_bp.route('/api/user/update', methods=['PUT'])
+@login_required
+def update_user_info():
+    try:
+        data = request.json
+
+        if not data:
+            return jsonify({'error': 'Aucune donnée fournie'}), 400
+
+        if 'email' in data:
+            new_email = data['email'].strip()
+
+            try:
+                # ✅ Validation complète : syntaxe + TLD + structure
+                valid = validate_email(new_email)
+                new_email = valid.email  # nettoyée et normalisée
+            except EmailNotValidError as e:
+                return jsonify({'error': str(e)}), 400
+
+            existing_user = Utilisateurs.query.filter_by(email=new_email).first()
+            if existing_user and existing_user.id_user != current_user.id_user:
+                return jsonify({'error': 'Cet email est déjà utilisé'}), 400
+
+            current_user.email = new_email
+
+        if 'nom' in data:
+            current_user.nom = data['nom']
+        if 'prenom' in data:
+            current_user.prenom = data['prenom']
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Informations utilisateur mises à jour avec succès',
+            'user': {
+                'id_user': current_user.id_user,
+                'nom': current_user.nom,
+                'prenom': current_user.prenom,
+                'email': current_user.email
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+    
+@users_bp.route('/api/user/profil/update', methods=['PUT'])
+@login_required
+def update_user_profil():
+    try:
+        data = request.json
+        
+        if not data:
+            return jsonify({'error': 'Aucune donnée fournie'}), 400
+            
+        # Vérifier si l'utilisateur a déjà un profil
+        profil = Profils_Utilisateurs.query.filter_by(user_id=current_user.id_user).first()
+        
+        if not profil:
+            # Créer un nouveau profil
+            profil = Profils_Utilisateurs(
+                user_id=current_user.id_user,
+                domaine_intérêt=data.get('domaine_intérêt', ''),
+                objectifs=data.get('objectifs', ''),
+                date_mise_à_jour=datetime.now()
+            )
+            db.session.add(profil)
+        else:
+            # Mettre à jour le profil existant
+            if 'domaine_intérêt' in data:
+                profil.domaine_intérêt = data['domaine_intérêt']
+            if 'objectifs' in data:
+                profil.objectifs = data['objectifs']
+            profil.date_mise_à_jour = datetime.now()
+            
+        db.session.commit()
+        
+        # Retourner le profil mis à jour
+        return jsonify({
+            'message': 'Profil utilisateur mis à jour avec succès',
+            'profil': {
+                'domaine_intérêt': profil.domaine_intérêt,
+                'objectifs': profil.objectifs,
+                'date_mise_à_jour': (
+                                    profil.date_mise_à_jour.isoformat()
+                                    if hasattr(profil.date_mise_à_jour, 'isoformat')
+                                    else profil.date_mise_à_jour
+                                )
+            }
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@users_bp.route('/api/user/password/reset', methods=['PUT'])
+@login_required
+def reset_user_password():
+    try:
+        data = request.json
+
+        if not data or 'ancien_mdp' not in data or 'nouveau_mdp' not in data:
+            return jsonify({'error': 'Données manquantes'}), 400
+
+        ancien = data['ancien_mdp']
+        nouveau = data['nouveau_mdp']
+
+        if not bcrypt.check_password_hash(current_user.mot_de_passe, ancien):
+            return jsonify({'error': 'Ancien mot de passe incorrect'}), 400
+
+        if len(nouveau) < 8:
+            return jsonify({'error': 'Le mot de passe doit contenir au moins 8 caractères'}), 400
+        
+        hashed = bcrypt.generate_password_hash(nouveau).decode('utf-8')
+        current_user.mot_de_passe = hashed
+        db.session.commit()
+
+        return jsonify({'message': 'Mot de passe mis à jour avec succès'}), 200
+
+    except Exception as e:
+        print(">> ERREUR CHANGEMENT MDP :", e)
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@users_bp.route('/api/user/supprimer', methods=['POST'])
+@login_required
+def supprimer_compte_api():
+    try:
+        # Supprimer d'abord les favoris de l'utilisateur
+        Favoris.query.filter_by(user_id=current_user.id_user).delete()
+        
+        # Supprimer l'historique de consultation de l'utilisateur
+        Historique_Consultation.query.filter_by(user_id=current_user.id_user).delete()
+        
+        # Supprimer le profil de l'utilisateur s'il existe
+        Profils_Utilisateurs.query.filter_by(user_id=current_user.id_user).delete()
+        
+        # Récupérer l'ID utilisateur avant de supprimer
+        user_id = current_user.id_user
+        
+        # Déconnecter l'utilisateur
+        logout_user()
+        
+        # Supprimer l'utilisateur
+        Utilisateurs.query.filter_by(id_user=user_id).delete()
+        db.session.commit()
+        
+        return jsonify({'message': 'Compte supprimé avec succès'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Get user favorites
+@users_bp.route('/api/profil/favoris', methods=['GET'])
+@login_required
+def afficher_favoris():
+    favoris = Favoris.query.filter_by(user_id=current_user.id_user).all()
+    
+    favoris_list = []
+    for favori in favoris:
+        cours = Cours.query.get(favori.cours_id)
+        if cours:
+            favoris_list.append({
+                "id_favoris": favori.id_favoris,
+                "cours_id": cours.id_cours,
+                "nom": cours.nom,
+                "domaine": cours.domaine,
+                "type_ressource": cours.type_ressource,
+                "niveau": cours.niveau,
+                "langue": cours.langue,
+                "date_ajout": favori.date_ajout.strftime("%Y-%m-%d %H:%M:%S") if favori.date_ajout else None
+            })
+    
+    return jsonify(favoris_list), 200
+
+# Add to favorites
+@users_bp.route('/api/profil/favoris/add/<int:cours_id>', methods=['POST'])
+@login_required
+def ajouter_favori(cours_id):
+    # Check if course exists
+    cours = Cours.query.get(cours_id)
+    if not cours:
+        return jsonify({"error": "Cours introuvable"}), 404
+    
+    # Check if already in favorites
+    favori_existant = Favoris.query.filter_by(user_id=current_user.id_user, cours_id=cours_id).first()
+    if favori_existant:
+        return jsonify({"error": "Ce cours est déjà dans vos favoris"}), 400
+    
+    try:
+        nouveau_favori = Favoris(
+            user_id=current_user.id_user,
+            cours_id=cours_id,
+            date_ajout=datetime.now()
+        )
+        db.session.add(nouveau_favori)
+        db.session.commit()
+        return jsonify({"message": "Cours ajouté aux favoris"}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# Remove from favorites
+@users_bp.route('/api/profil/favoris/delete/<int:favori_id>', methods=['POST'])
+@login_required
+def supprimer_favori(favori_id):
+    favori = Favoris.query.filter_by(id_favoris=favori_id, user_id=current_user.id_user).first()
+    
+    if not favori:
+        return jsonify({"error": "Favori introuvable"}), 404
+    
+    try:
+        db.session.delete(favori)
+        db.session.commit()
+        return jsonify({"message": "Favori supprimé avec succès"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# Get user history
+@users_bp.route('/api/profil/historique', methods=['GET'])
+@login_required
+def afficher_historique():
+    # Récupérer l'historique avec une jointure sur la table Cours
+    historique = db.session.query(
+        Historique_Consultation,
+        Cours.nombre_vues,
+        Cours.langue,
+        Cours.type_ressource
+    ).join(
+        Cours, Historique_Consultation.cours_id == Cours.id_cours
+    ).filter(
+        Historique_Consultation.user_id == current_user.id_user
+    ).order_by(
+        Historique_Consultation.date_consultation.desc()
+    ).all()
+
+    historique_list = []
+    for item in historique:
+        # item est maintenant un tuple (Historique_Consultation, nombre_vues, langue, type_ressource)
+        historique_item = item[0]
+        cours = Cours.query.get(historique_item.cours_id)  # Accès via l'ID
+        
+        if cours:
+            historique_list.append({
+                "id_historique": historique_item.id_historique,
+                "cours_id": cours.id_cours,
+                "nom": cours.nom,
+                "domaine": cours.domaine,
+                "type_ressource": cours.type_ressource,
+                "langue": cours.langue,
+                "niveau": cours.niveau,
+                "nombre_vues": cours.nombre_vues,
+                "date_consultation": historique_item.date_consultation.strftime("%Y-%m-%d") if historique_item.date_consultation else None,
+                "heure_consultation": historique_item.date_consultation.strftime("%H:%M:%S") if historique_item.date_consultation else None,
+                "objectifs": cours.objectifs if hasattr(cours, 'objectifs') else None,
+                "durée": cours.durée if hasattr(cours, 'durée') else None
+            })
+
+    return jsonify(historique_list), 200
+
+# Clear user history
+@users_bp.route('/api/profil/historique/clear', methods=['POST'])
+@login_required
+def effacer_historique():
+    try:
+        Historique_Consultation.query.filter_by(user_id=current_user.id_user).delete()
+        db.session.commit()
+        return jsonify({"message": "Historique effacé avec succès"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+
+#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+'''from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user, logout_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, SelectField
@@ -30,7 +399,7 @@ class UpdateProfilForm(FlaskForm):
     submit = SubmitField("Mettre à jour")
 
 @users_bp.route('/profil')
-@login_required_route
+@login_required
 def profil():
     form = DeleteAccountForm()
     profil = Profils_Utilisateurs.query.filter_by(user_id=current_user.id_user).first()
@@ -43,7 +412,7 @@ class ModifierProfilForm(FlaskForm):
     submit = SubmitField("Enregistrer")
 
 @users_bp.route('/profil/modifier', methods=['GET', 'POST'])
-@login_required_route
+@login_required
 def modifier_profil():
     form = ModifierProfilForm(obj=current_user)
     if form.validate_on_submit():
@@ -56,7 +425,7 @@ def modifier_profil():
     return render_template('modifier_profil.html', form=form, user=current_user)
 
 @users_bp.route('/profil/update', methods=['GET', 'POST'])
-@login_required_route
+@login_required
 def update_profil():
     form = UpdateProfilForm()
     profil = Profils_Utilisateurs.query.filter_by(user_id=current_user.id_user).first()
@@ -94,7 +463,7 @@ class DeleteAccountForm(FlaskForm):
 
 
 @users_bp.route('/profil/delete', methods=['POST'])
-@login_required_route
+@login_required
 def supprimer_compte():
     form = DeleteAccountForm()
     if form.validate_on_submit():  # Vérifie le token CSRF
@@ -128,7 +497,7 @@ class ChangerMotDePasseForm(FlaskForm):
 
 
 @users_bp.route('/profil/changer_mot_de_passe/reset', methods=['GET', 'POST'])
-@login_required_route
+@login_required
 def changer_mot_de_passe():
     form = ChangerMotDePasseForm()
     if form.validate_on_submit():
@@ -140,14 +509,14 @@ def changer_mot_de_passe():
 #######
 #####
 @users_bp.route('/profil/favoris')
-@login_required_route
+@login_required
 def afficher_favoris():
     utilisateur = current_user
     favoris = utilisateur.favoris
     return render_template('favoris.html', utilisateur=utilisateur, favoris=favoris, cours=Cours)
 
-'''@users_bp.route('/supprimer_favori/<int:favori_id>', methods=['POST'])
-@login_required_route
+@users_bp.route('/supprimer_favori/<int:favori_id>', methods=['POST'])
+@login_required
 def supprimer_favori(favori_id):
     favori = Favoris.query.filter_by(id_favoris=favori_id).first()
     if favori:
@@ -156,10 +525,10 @@ def supprimer_favori(favori_id):
         flash("Favori supprimé avec succès.", "success")
     else:
         flash("Erreur : Favori introuvable.", "danger")
-    return redirect(url_for('users.afficher_favoris'))'''
+    return redirect(url_for('users.afficher_favoris'))
 
 @users_bp.route('/profil/historique')
-@login_required_route
+@login_required
 def afficher_historique():
     historique = Historique_Consultation.query.filter_by(user_id=current_user.id_user).all()
-    return render_template('historique.html', historique=historique, cours=Cours)
+    return render_template('historique.html', historique=historique, cours=Cours)'''

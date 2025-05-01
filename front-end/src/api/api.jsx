@@ -41,8 +41,10 @@ export const getDashboardData = async (params = {}) => {
 
 export const searchCours = async (params = {}) => {
   try {
+    // Ajout d'un timestamp pour éviter la mise en cache du navigateur ou des CDN
+    const timestamp = Date.now();
     const response = await axios.get(`${API_URL}/api/cours`, {
-      params,
+      params: { ...params, _t: timestamp },
       withCredentials: true,
     });
     return response.data;
@@ -51,6 +53,7 @@ export const searchCours = async (params = {}) => {
     return [];
   }
 };
+
 
 export const AdminCours = async (params = {}) => {
   try {
@@ -228,6 +231,138 @@ export const updateCourse = async (courseId, formData) => {
     return response.data;
   } catch (error) {
     console.error("Erreur lors de la mise à jour du cours :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+
+////////profile
+// Routes du profil utilisateur
+export const fetchProfile = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/user/profile`, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la récupération du profil:', error);
+    throw error;
+  }
+};
+
+// Mettre à jour les informations personnelles de l'utilisateur
+export const updateProfileInfo = async (userData) => {
+  try {
+    const response = await axios.put(`${API_URL}/api/user/update`, userData, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du profil:', error);
+    throw error;
+  }
+};
+
+// Mettre à jour les préférences d'apprentissage de l'utilisateur
+export const updatePreferences = async (preferencesData) => {
+  try {
+    const response = await axios.put(`${API_URL}/api/user/profil/update`, preferencesData, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour des préférences:', error);
+    throw error;
+  }
+};
+
+// Changer le mot de passe de l'utilisateur
+export const changePassword = async (passwordData) => {
+  try {
+    const response = await axios.put(`${API_URL}/api/user/password/reset`, passwordData, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors du changement de mot de passe:', error);
+    throw error;
+  }
+};
+
+// Supprimer le compte utilisateur
+export const deleteAccount = async () => {
+  try {
+    const response = await axios.post(`${API_URL}/api/user/supprimer`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la suppression du compte:', error);
+    throw error;
+  }
+};
+
+// Route des favoris
+export const getFavorites = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/profil/favoris`, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des favoris:', error);
+    throw error;
+  }
+};
+
+// Ajouter un cours aux favoris
+export const addToFavorites = async (coursId) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/profil/favoris/add/${coursId}`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout aux favoris:', error);
+    throw error;
+  }
+};
+
+// Supprimer un cours des favoris
+export const removeFavorite = async (favoriteId) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/profil/favoris/delete/${favoriteId}`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la suppression du favori:', error);
+    throw error;
+  }
+};
+
+// Route de l'historique
+export const getHistory = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/profil/historique`, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'historique:', error);
+    throw error;
+  }
+};
+
+// Effacer l'historique de consultation
+export const clearHistory = async () => {
+  try {
+    const response = await axios.post(`${API_URL}/api/profil/historique/clear`, {}, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de l\'effacement de l\'historique:', error);
     throw error;
   }
 };

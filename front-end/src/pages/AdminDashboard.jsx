@@ -5,6 +5,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import AdminNavbar from './navbars/AdminNavbar';
+import { Link } from "react-router-dom";
+
 
 const COLORS = ['#4361ee', '#3a0ca3', '#7209b7', '#f72585', '#4cc9f0', '#4895ef'];
 
@@ -514,13 +516,13 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="card-footer bg-transparent text-end">
-            <button className="btn btn-sm" style={{
+            <Link to='/admin/courses' className="btn btn-sm" style={{
               background: "var(--primary-color)",
               color: "var(--white)",
               borderRadius: "var(--border-radius-sm)"
             }}>
               Voir tous les cours
-            </button>
+            </Link>
           </div>
         </div>
       </div>

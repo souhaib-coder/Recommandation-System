@@ -3,8 +3,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, IntegerField, SubmitField, TextAreaField, FileField
-from wtforms.validators import DataRequired, Optional, NumberRange
+from wtforms import StringField, SelectField, IntegerField, SubmitField, TextAreaField, FileField,URLField
+from wtforms.validators import DataRequired, Optional, NumberRange, URL
 
 from Models import db,Cours, Favoris,Utilisateurs, Historique_Consultation, Profils_Utilisateurs, Avis,app
 from security import *
@@ -84,6 +84,16 @@ class CoursForm(FlaskForm):
                             validators=[DataRequired()])
     durée = IntegerField("Durée (en heures)", validators=[Optional()])
 
+    type_contenu = SelectField('Type de contenu', choices=[
+        ('fichier', 'Fichier'),
+        ('lien', 'Lien URL')
+    ], validators=[DataRequired()])
+
+    url_cours = URLField('URL du cours', validators=[
+        Optional(),  # Le champ est facultatif car il ne s'applique que si type_contenu est 'lien'
+        URL(message="L'URL doit être valide et commencer par http:// ou https://")
+    ])
+
     fichier_cours = FileField("Télécharger le fichier", validators=[Optional()])
 
 
@@ -112,16 +122,16 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 @login_required
 def search_cours():
     user_id = current_user.id_user
-
     # Récupérer les paramètres de la requête
     search = request.args.get('search', '')
     domaine = request.args.get('domaine', '')
     type_ressource = request.args.get('type_ressource', '')
     niveau = request.args.get('niveau', '')
-
+    timestamp = request.args.get('_t', '') # Paramètre timestamp ajouté pour éviter la mise en cache
+    
     query = db.session.query(Cours)
     cours_list = []
-
+    
     # Appliquer les filtres si des paramètres sont présents
     if search or domaine or type_ressource or niveau:
         if search:
@@ -134,21 +144,36 @@ def search_cours():
             query = query.filter(Cours.niveau == niveau)
         cours_list = query.all()
     else:
-        # Si aucun filtre, renvoyer les recommandations
+        # Si aucun filtre, renvoyer les recommandations dynamiques
         cours_list = cours_recommandes(user_id)
+        
+        # S'assurer que les informations de favoris sont ajoutées
+        favoris_ids = {f.cours_id for f in Favoris.query.filter_by(user_id=user_id).all()}
+        
+        # Ajouter l'information est_favori à chaque cours
+        for cours in cours_list:
+            cours["est_favori"] = cours["id_cours"] in favoris_ids
+            
         return jsonify(cours_list), 200
+    
+    # Pour les résultats de recherche, aussi ajouter l'information des favoris
+    favoris_ids = {f.cours_id for f in Favoris.query.filter_by(user_id=user_id).all()}
+    
+    result = [{
+        "id_cours": cours.id_cours,
+        "nom": cours.nom,
+        "domaine": cours.domaine,
+        "type_ressource": cours.type_ressource,
+        "niveau": cours.niveau,
+        "langue": cours.langue,
+        "objectifs": cours.objectifs,
+        "chemin_source": cours.chemin_source,
+        "nombre_vues": cours.nombre_vues,
+        "est_favori": cours.id_cours in favoris_ids
+    } for cours in cours_list]
+    
+    return jsonify(result), 200
 
-    return jsonify([{
-            "id_cours": cours.id_cours,
-            "nom": cours.nom,
-            "domaine": cours.domaine,
-            "type_ressource": cours.type_ressource,
-            "niveau": cours.niveau,
-            "langue": cours.langue,
-            "objectifs": cours.objectifs,
-            "chemin_source": cours.chemin_source,
-            "nombre_vues": cours.nombre_vues,
-        } for cours in cours_list]), 200
 ##########
 @courses_bp.route('/api/admin/cours', methods=['GET'])
 @login_required
@@ -225,11 +250,11 @@ def details_cours(id_cours):
         },
         "avis": [
             {
-                "id": a.id,
-                "utilisateur": a.utilisateur.username,
+                "id": a.id_avis,
+                "utilisateur": a.utilisateur.nom,
                 "note": a.note,
                 "commentaire": a.commentaire,
-                "date": a.date.strftime("%Y-%m-%d")
+                "date": a.date
             } for a in avis
         ],
         "form_schema": form_schema,
@@ -239,18 +264,13 @@ def details_cours(id_cours):
 
 ##########admin ajoute cours
 
-
 @courses_bp.route("/api/admin/cours/ajouter", methods=["GET", "POST"])
 @login_required
 @admin_required
 def ajouter_cours():
-
     form = CoursForm()
 
     if form.validate_on_submit():
-        if not form.fichier_cours.data:
-            return jsonify({"error": "Le fichier est obligatoire pour un nouveau cours."}), 400
-
         # Récupérer les données du formulaire
         nom = form.nom.data
         type_ressource = form.type_ressource.data
@@ -259,22 +279,43 @@ def ajouter_cours():
         niveau = form.niveau.data
         objectifs = form.objectifs.data
         durée = form.durée.data
-        chemin_source = form.fichier_cours.data
+        type_contenu = form.type_contenu.data
+        
+        chemin_source = ""
+        
+        # Traitement selon le type de contenu (fichier ou lien)
+        if type_contenu == 'lien':
+            # Vérifier et utiliser l'URL fournie
+            url_cours = form.url_cours.data
+            
+            # Vérification simple de l'URL (peut être améliorée)
+            if not url_cours or not (url_cours.startswith('http://') or url_cours.startswith('https://')):
+                return jsonify({"error": "URL invalide. Elle doit commencer par http:// ou https://"}), 400
+                
+            chemin_source = url_cours
+            
+        else:  # type_contenu == 'fichier'
+            # Vérifier qu'un fichier a été fourni
+            if not form.fichier_cours.data:
+                return jsonify({"error": "Le fichier est obligatoire pour un nouveau cours de type fichier."}), 400
+                
+            # Vérifier si le fichier a une extension autorisée
+            if form.fichier_cours.data and allowed_file(form.fichier_cours.data.filename):
+                filename = secure_filename(form.fichier_cours.data.filename)
 
-        # Vérifier si le fichier a une extension autorisée
-        if chemin_source and allowed_file(chemin_source.filename):
-            filename = secure_filename(chemin_source.filename)
+                # Créer la structure de répertoire dynamique
+                folder_path = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', domaine, langue, niveau, type_ressource)
+                if not os.path.exists(folder_path):
+                    os.makedirs(folder_path)
 
-            # Créer la structure de répertoire dynamique
-            folder_path = os.path.join(app.config['UPLOAD_FOLDER'],'cours', domaine, langue, niveau, type_ressource)
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-
-            # Sauvegarder le fichier dans le répertoire
-            filepath = os.path.join(folder_path, filename)
-            chemin_source.save(filepath)  #enregistre le fichier uploadé dans ce chemin
-        else:
-            return jsonify({"error": "Fichier non autorisé."}), 400
+                # Sauvegarder le fichier dans le répertoire
+                filepath = os.path.join(folder_path, filename)
+                form.fichier_cours.data.save(filepath)
+                
+                # Stocke un chemin relatif
+                chemin_source = os.path.relpath(filepath, 'static/').replace("\\", "/")
+            else:
+                return jsonify({"error": "Fichier non autorisé."}), 400
 
         # Ajouter le cours à la base de données
         nouveau_cours = Cours(
@@ -285,8 +326,7 @@ def ajouter_cours():
             niveau=niveau,
             objectifs=objectifs,
             durée=durée if durée else None,
-            chemin_source = os.path.relpath(filepath, 'static/').replace("\\", "/")  # Stocke un chemin relatif
-
+            chemin_source=chemin_source
         )
 
         db.session.add(nouveau_cours)
@@ -295,16 +335,12 @@ def ajouter_cours():
         return jsonify({"message": "Cours ajouté avec succès", "id": nouveau_cours.id_cours}), 201
 
     return jsonify({"errors": form.errors}), 400
-#######
 
-######maj
+
 @courses_bp.route('/api/admin/cours/update/<int:id_cours>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def mettre_a_jour_cours(id_cours):
-
-   
-
     # Récupérer le cours à modifier à partir de l'ID
     cours_a_modifier = Cours.query.get_or_404(id_cours)
 
@@ -320,56 +356,76 @@ def mettre_a_jour_cours(id_cours):
         cours_a_modifier.niveau = form.niveau.data
         cours_a_modifier.objectifs = form.objectifs.data
         cours_a_modifier.durée = form.durée.data
+        
+        # Déterminer le type de contenu actuel (fichier ou lien)
+        est_lien = cours_a_modifier.chemin_source.startswith('http://') or cours_a_modifier.chemin_source.startswith('https://')
+        
+        # Si c'est un lien et qu'une nouvelle URL est fournie
+        if est_lien and form.url_cours.data:
+            # Vérification simple de l'URL
+            url_cours = form.url_cours.data
+            if not (url_cours.startswith('http://') or url_cours.startswith('https://')):
+                return jsonify({"error": "URL invalide. Elle doit commencer par http:// ou https://"}), 400
+                
+            cours_a_modifier.chemin_source = url_cours
+            
+        # Si c'est un fichier et qu'un nouveau fichier est fourni
+        elif not est_lien and form.fichier_cours.data:
+            # Vérifier si le fichier a une extension autorisée
+            if allowed_file(form.fichier_cours.data.filename):
+                # Supprimer l'ancien fichier s'il existe
+                ancien_chemin_absolu = os.path.join(app.config['UPLOAD_FOLDER'], cours_a_modifier.chemin_source)
+                if os.path.exists(ancien_chemin_absolu):
+                    os.remove(ancien_chemin_absolu)
 
-        # Si un nouveau fichier est téléchargé
-        if form.fichier_cours.data and allowed_file(form.fichier_cours.data.filename):
-            # Supprimer l'ancien fichier
-            if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], cours_a_modifier.chemin_source)):
-                os.remove(os.path.join(app.config['UPLOAD_FOLDER'] ,cours_a_modifier.chemin_source))
+                # Enregistrer le nouveau fichier
+                chemin_source = form.fichier_cours.data
+                filename = secure_filename(chemin_source.filename)
 
-            # Enregistrer le nouveau fichier
-            chemin_source = form.fichier_cours.data
-            filename = secure_filename(chemin_source.filename)
+                # Créer la structure de répertoire dynamique pour le nouveau fichier
+                folder_path = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', 
+                                         cours_a_modifier.domaine, cours_a_modifier.langue, 
+                                         cours_a_modifier.niveau, cours_a_modifier.type_ressource)
+                if not os.path.exists(folder_path):
+                    os.makedirs(folder_path)
 
-            # Créer la structure de répertoire dynamique pour le nouveau fichier
-            folder_path = os.path.join(app.config['UPLOAD_FOLDER'],'cours', cours_a_modifier.domaine, cours_a_modifier.langue, cours_a_modifier.niveau, cours_a_modifier.type_ressource)
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
+                # Sauvegarder le nouveau fichier dans le répertoire
+                filepath = os.path.join(folder_path, filename)
+                chemin_source.save(filepath)
 
-            # Sauvegarder le nouveau fichier dans le répertoire
-            filepath = os.path.join(folder_path, filename)
-            chemin_source.save(filepath)
-
-            # Mettre à jour le chemin du fichier dans la base de données
-            cours_a_modifier.chemin_source = os.path.relpath(filepath, 'static/').replace("\\", "/")
-        else:
-            # Pas de nouveau fichier mais les infos (domaine/langue/etc.) ont changé → déplacer l'ancien fichier
+                # Mettre à jour le chemin du fichier dans la base de données
+                cours_a_modifier.chemin_source = os.path.relpath(filepath, 'static/').replace("\\", "/")
+            else:
+                return jsonify({"error": "Fichier non autorisé."}), 400
+                
+        # Si c'est un fichier mais pas de nouveau fichier fourni, et que les infos ont changé
+        elif not est_lien and not form.fichier_cours.data:
+            # On vérifie si on doit déplacer le fichier à cause des changements de domaine/langue/etc.
             ancien_chemin = os.path.join(app.config['UPLOAD_FOLDER'], cours_a_modifier.chemin_source)
-            ancien_nom_fichier = os.path.basename(ancien_chemin)
+            if os.path.exists(ancien_chemin):
+                ancien_nom_fichier = os.path.basename(ancien_chemin)
+                
+                nouveau_dossier = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', 
+                                             form.domaine.data, form.langue.data, 
+                                             form.niveau.data, form.type_ressource.data)
+                if not os.path.exists(nouveau_dossier):
+                    os.makedirs(nouveau_dossier)
 
-            nouveau_dossier = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', form.domaine.data, form.langue.data, form.niveau.data, form.type_ressource.data)
-            if not os.path.exists(nouveau_dossier):
-                os.makedirs(nouveau_dossier)
+                nouveau_chemin = os.path.join(nouveau_dossier, ancien_nom_fichier)
 
-            nouveau_chemin = os.path.join(nouveau_dossier, ancien_nom_fichier)
+                # Déplacer le fichier s'il n'est pas déjà à cet endroit
+                if ancien_chemin != nouveau_chemin:
+                    os.rename(ancien_chemin, nouveau_chemin)
 
-            # Déplacer le fichier s’il n’est pas déjà à cet endroit
-            if ancien_chemin != nouveau_chemin and os.path.exists(ancien_chemin):
-                os.rename(ancien_chemin, nouveau_chemin)
-
-            # Mettre à jour le chemin dans la BDD
-            cours_a_modifier.chemin_source = os.path.relpath(nouveau_chemin, 'static/').replace("\\", "/")
+                # Mettre à jour le chemin dans la BDD
+                cours_a_modifier.chemin_source = os.path.relpath(nouveau_chemin, 'static/').replace("\\", "/")
 
         # Sauvegarder les modifications dans la base de données
         db.session.commit()
 
-        # Message flash pour indiquer que le cours a été modifié avec succès
-
-        # Rediriger vers la page de gestion des cours ou la liste des cours
         return jsonify({"message": "Cours modifié avec succès."}), 200
 
     return jsonify({"errors": form.errors}), 400
-
 ######ajou fav
 
 @courses_bp.route('/api/profil/favoris/ajouter/<int:id_cours>', methods=['POST'])
@@ -430,17 +486,20 @@ def ajouter_avis(id_cours):
     user_id = current_user.id_user
     message = ""
     
-    # Check if this is a direct route call (API request)
+    # Pour les appels API directs
     if request.path.startswith('/api/cours/avis/'):
         if request.method == 'POST':
             if request.is_json:
-                form_data = request.get_json()
-                form = AvisForm(data=form_data)
-            
-            if form.validate_on_submit():
-                note = form.note.data
-                commentaire = form.commentaire.data.strip()
+                # Récupérer les données JSON
+                data = request.get_json()
+                note = data.get('note')
+                commentaire = data.get('commentaire', '').strip()
                 
+                # Vérifications basiques
+                if not note or not isinstance(note, int) or note < 1 or note > 5:
+                    return jsonify({"error": "Note invalide. Doit être un nombre entre 1 et 5."}), 400
+                
+                # Vérifier si un avis existe déjà
                 avis_existant = Avis.query.filter_by(user_id=user_id, cours_id=id_cours).first()
                 
                 if avis_existant:
@@ -469,9 +528,17 @@ def ajouter_avis(id_cours):
                 
                 db.session.commit()
                 return jsonify({"message": message}), 201
-            return jsonify({"errors": form.errors}), 400
+            # Si ce n'est pas du JSON, essayer de traiter comme form-data
+            else:
+                if form.validate_on_submit():
+                    note = form.note.data
+                    commentaire = form.commentaire.data.strip()
+                    
+                    # Même logique que ci-dessus pour le traitement
+                    # ...
+                return jsonify({"errors": form.errors}), 400
         
-        # If GET request to API endpoint, return form structure
+        # Si GET request à l'endpoint API, retourner la structure du formulaire
         form_schema = {
             'note': {
                 'label': form.note.label.text,
@@ -485,7 +552,7 @@ def ajouter_avis(id_cours):
         }
         return jsonify({"form": form_schema}), 200
     
-    # If this function is called from another function (not directly as a route)
+    # Si la fonction est appelée depuis une autre fonction (pas directement comme route)
     return form
 
 def enregistrer_consultation(id_user, id_cours, titre_cours):
@@ -526,22 +593,28 @@ def enregistrer_consultation(id_user, id_cours, titre_cours):
 
 
 ######popularrite
+
 def cours_recommandes(user_id):
     utilisateur = Utilisateurs.query.get(user_id)
     if not utilisateur:
         return []
-    
+   
+    # Obtenir les IDs des cours déjà vus, favoris ou notés
     historique_ids = [h.cours_id for h in Historique_Consultation.query.filter_by(user_id=user_id).all()]
     favoris_ids = [f.cours_id for f in Favoris.query.filter_by(user_id=user_id).all()]
     avis_user = Avis.query.filter_by(user_id=user_id).all()
     avis_ids = [a.cours_id for a in avis_user]
-
+    
+    # Obtenir les préférences du profil utilisateur
     profil = Profils_Utilisateurs.query.filter_by(user_id=user_id).first()
     domaine_pref = profil.domaine_intérêt if profil else None
     objectif_pref = profil.objectifs if profil else None
-
-    cours_exclus = set(historique_ids + favoris_ids + avis_ids)
-
+    
+    # Déterminer les cours à exclure des recommandations
+    # MODIFICATION: Ne pas exclure les cours favoris des recommandations
+    # pour que l'utilisateur puisse continuer à les voir même s'ils sont favoris
+    cours_exclus = set(historique_ids + avis_ids)  # On retire favoris_ids de cette liste
+    
     query = db.session.query(
         Cours,
         func.coalesce(func.avg(Avis.note), 0).label("moyenne_note"),
@@ -554,16 +627,16 @@ def cours_recommandes(user_id):
     ).outerjoin(Avis, Cours.id_cours == Avis.cours_id
     ).outerjoin(Favoris, Cours.id_cours == Favoris.cours_id
     ).outerjoin(Historique_Consultation, Cours.id_cours == Historique_Consultation.cours_id)
-
+    
     if domaine_pref:
         query = query.filter(Cours.domaine == domaine_pref)
     if objectif_pref:
         query = query.filter(Cours.objectifs == objectif_pref)
     if cours_exclus:
         query = query.filter(~Cours.id_cours.in_(cours_exclus))
-
-    result = query.group_by(Cours.id_cours).order_by(desc('score')).limit(30).all()
-
+        
+    result = query.group_by(Cours.id_cours).order_by(desc('score')).limit(50).all()
+    
     # Retourner une liste de tuples (cours, moyenne_note, score)
     return [{
         "id_cours": cours.id_cours,

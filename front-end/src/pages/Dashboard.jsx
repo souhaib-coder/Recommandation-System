@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from "react";
-import { getDashboardData, searchCours } from "../api/api";
+import React, { useEffect, useState, useCallback } from "react";
+import { getDashboardData, searchCours, toggleFavorite } from "../api/api";
 import AdminNavbar from "./navbars/AdminNavbar";
 import UserNavbar from "./navbars/UserNavbar";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 const Dashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [recommandations, setRecommandations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const location = useLocation();
 
   // États pour les filtres de recherche
   const [search, setSearch] = useState("");
@@ -19,27 +22,31 @@ const Dashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [coursPerPage] = useState(6);
   const [totalPages, setTotalPages] = useState(1);
+  
+  // État pour suivre la dernière mise à jour des recommandations
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
 
-  const fetchRecommandations = (filters = {}) => {
+  const fetchRecommandations = useCallback((filters = {}) => {
     const cleanFilters = {};
     Object.keys(filters).forEach(key => {
       if (filters[key]) cleanFilters[key] = filters[key];
     });
   
     setLoading(true);
-    searchCours(cleanFilters)
+    searchCours({ ...cleanFilters, timestamp: Date.now() }) // Ajout d'un timestamp pour éviter la mise en cache
       .then((data) => {
         setRecommandations(data);
         setTotalPages(Math.ceil(data.length / coursPerPage));
         setLoading(false);
+        setLastUpdate(Date.now());
       })
       .catch((err) => {
         console.error("Erreur lors du chargement des recommandations:", err);
         setLoading(false);
       });
-  };
+  }, [coursPerPage]);
 
-  const fetchDashboard = () => {
+  const fetchDashboard = useCallback(() => {
     setLoading(true);
     getDashboardData()
       .then((data) => {
@@ -50,12 +57,37 @@ const Dashboard = () => {
         console.error("Erreur lors du chargement du dashboard:", err);
         setLoading(false);
       });
-  };
+  }, []);
 
+  // Initialisation au chargement de la page
   useEffect(() => {
     fetchDashboard();
     fetchRecommandations();
-  }, []);
+  }, [fetchDashboard, fetchRecommandations]);
+  
+  // Rafraîchir les recommandations lorsque l'utilisateur revient sur la page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && 
+          !search && !domaine && !type && !niveau && 
+          Date.now() - lastUpdate > 60000) { // Si plus d'une minute s'est écoulée
+        fetchRecommandations();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchRecommandations, search, domaine, type, niveau, lastUpdate]);
+  
+  // Rafraîchir les recommandations lorsque l'utilisateur navigue vers cette page
+  useEffect(() => {
+    if (!search && !domaine && !type && !niveau) {
+      fetchRecommandations();
+    }
+  }, [location.pathname, fetchRecommandations, search, domaine, type, niveau]);
   
   // Appliquer les filtres automatiquement à chaque changement
   useEffect(() => {
@@ -66,7 +98,7 @@ const Dashboard = () => {
       niveau,
     });
     setCurrentPage(1); // Revenir à la première page après un changement de filtre
-  }, [search, domaine, type, niveau]);
+  }, [search, domaine, type, niveau, fetchRecommandations]);
   
   // Fonction pour obtenir les icônes par domaine
   const getDomaineIcon = (domaine) => {
@@ -88,6 +120,30 @@ const Dashboard = () => {
       "Avancé": "bg-danger",
     };
     return colors[niveau] || "bg-secondary";
+  };
+
+  // Gestion des favoris
+  const handleToggleFavorite = async (courseId, isFav) => {
+    try {
+      await toggleFavorite(courseId);
+      
+      // Mise à jour locale de l'état du favori
+      const updatedCourses = recommandations.map(course => {
+        if (course.id_cours === courseId) {
+          return { ...course, est_favori: !isFav };
+        }
+        return course;
+      });
+      
+      setRecommandations(updatedCourses);
+      
+      // Message de confirmation
+      setMessage(isFav ? "Retiré des favoris" : "Ajouté aux favoris");
+      setTimeout(() => setMessage(""), 3000);
+    } catch (error) {
+      setError("Erreur lors de la modification des favoris");
+      setTimeout(() => setError(""), 3000);
+    }
   };
 
   // Pagination - obtenir les cours actuels
@@ -118,9 +174,6 @@ const Dashboard = () => {
         marginTop: "70px",
         padding: "3rem 0"
       }}>
-
-
-        
         <div className="container position-relative" style={{zIndex: "2"}}>
           <div className="row align-items-center">
             <div className="col-lg-12 py-4 text-center">
@@ -137,6 +190,22 @@ const Dashboard = () => {
       </div>
 
       <div className="container py-5">
+        {message && (
+          <div className="alert alert-success alert-dismissible fade show shadow-sm rounded-lg mb-4" role="alert">
+            <i className="bi bi-check-circle me-2"></i>
+            {message}
+            <button type="button" className="btn-close" onClick={() => setMessage("")}></button>
+          </div>
+        )}
+        
+        {error && (
+          <div className="alert alert-danger alert-dismissible fade show shadow-sm rounded-lg mb-4" role="alert">
+            <i className="bi bi-exclamation-circle me-2"></i>
+            {error}
+            <button type="button" className="btn-close" onClick={() => setError("")}></button>
+          </div>
+        )}
+        
         <div className="row g-4">
           {/* Left Column (Filtres) */}
           <div className="col-lg-4">
@@ -244,9 +313,22 @@ const Dashboard = () => {
                 
                 <div className="mt-4 pt-3 border-top">
                   <Link to="/user/favorites" className="btn btn-outline-primary w-100">
-                    <i className="bi bi-heart me-2"></i>Voir mes cours favoris
+                    <i className="bi bi-bookmark-fill me-2"></i>Voir mes cours favoris
                   </Link>
                 </div>
+                
+                {/* Bouton pour rafraîchir les recommandations */}
+                {(!search && !domaine && !type && !niveau) && (
+                  <div className="mt-3">
+                    <button 
+                      className="btn btn-light w-100" 
+                      onClick={() => fetchRecommandations()}
+                      style={{borderRadius: "var(--border-radius-lg)"}}
+                    >
+                      <i className="bi bi-arrow-repeat me-2"></i>Rafraîchir les recommandations
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -313,8 +395,15 @@ const Dashboard = () => {
                             <span className="badge" style={{background: "var(--accent-bg)", color: "var(--text-dark)"}}>
                               {c.domaine}
                             </span>
-                            <button className="btn btn-sm btn-icon">
-                              <i className="bi bi-heart"></i>
+                            <button 
+                              className={`btn ${c.est_favori ? 'btn-warning shadow-sm' : 'btn-light'} btn-sm`}
+                              onClick={() => handleToggleFavorite(c.id_cours, c.est_favori)}
+                              style={{
+                                borderRadius: "var(--border-radius-sm)",
+                                transition: "all 0.3s ease"
+                              }}
+                            >
+                              <i className={`bi ${c.est_favori ? 'bi-bookmark-fill' : 'bi-bookmark'}`}></i>
                             </button>
                           </div>
                           <h5 className="card-title mb-3">{c.nom}</h5>
@@ -389,12 +478,12 @@ const Dashboard = () => {
           <div className="row">
             <div className="col-md-6">
               <h5 className="fw-bold mb-3">
-                <i className="bi bi-lightning-charge-fill me-2"></i>DocStorm
+                <i className="bi bi-lightning-charge-fill me-2"></i>DevStorm
               </h5>
               <p style={{color: "var(--text-light)"}}>Plateforme mondiale d'éducation et de formation en ligne.</p>
             </div>
             <div className="col-md-6 text-md-end">
-              <p className="mb-0" style={{color: "var(--text-light)"}}>© 2025 DocStorm. Tous droits réservés.</p>
+              <p className="mb-0" style={{color: "var(--text-light)"}}>© 2025 DevStorm. Tous droits réservés.</p>
             </div>
           </div>
         </div>
