@@ -109,7 +109,7 @@ const HomeNavbar = () => {
           {/* Login à droite */}
           <ul className="navbar-nav ms-auto">
             <li className="nav-item">
-              <Link className="btn btn-sm" to="/Login" style={{
+              <Link className="btn btn-sm" to="/auth" style={{
                 background: primaryColor,
                 color: "var(--white)",
                 borderRadius: "var(--border-radius-sm)",

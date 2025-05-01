@@ -7,7 +7,7 @@ const Home = () => {
   const [currentDomain, setCurrentDomain] = useState("Informatique");
 
   const handleStartLearning = () => {
-    navigate("/Login");
+    navigate("/auth");
   };
 
   // Fonction pour obtenir les icônes par domaine
@@ -206,7 +206,7 @@ const Home = () => {
                     <p className="card-text" style={{ color: "var(--text-light)" }}>{category.desc}</p>
                   </div>
                   <div className="card-footer border-top d-grid" style={{ background: "var(--white)" }}>
-                    <Link to="/Login" className="btn" style={{
+                    <Link to="/auth" className="btn" style={{
                       background: "var(--primary-color)",
                       color: "var(--white)",
                       borderRadius: "var(--border-radius-sm)"
@@ -308,7 +308,7 @@ const Home = () => {
                           <h2 className="mb-3">Prêt à rejoindre notre communauté ?</h2>
                           <p className="mb-4 mx-auto" style={{ maxWidth: "700px" }}>Rejoignez plus de 100 000 apprenants et commencez votre parcours d'apprentissage dès aujourd'hui.</p>
                           <div className="d-flex gap-3 justify-content-center">
-                            <Link to="/Login" className="btn btn-lg" style={{
+                            <Link to="/auth" className="btn btn-lg" style={{
                               background: "var(--white)",
                               color: "var(--primary-color)",
                               borderRadius: "var(--border-radius-lg)",

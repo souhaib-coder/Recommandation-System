@@ -193,45 +193,147 @@ export const getUsersActivity = async (timeFrame = 'week') => {
 // Nous laissons la méthode POST puisque c'est ce que votre backend attend
 
 // Fonction pour supprimer un cours (correction - changé de méthode HTTP DELETE à POST)
+// Amélioration des fonctions d'API pour une meilleure gestion des erreurs
+// et des réponses du serveur
+
+// Suppression d'un cours
 export const deleteCourse = async (id) => {
   try {
     const response = await axios.post(`${API_URL}/api/admin/cours/delete/${id}`, {}, {
-      withCredentials: true
+      withCredentials: true,
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
     return response.data;
   } catch (error) {
-    console.error("Erreur lors de la suppression du cours :", error.response?.data || error.message);
-    throw error;
+    console.error("Erreur lors de la suppression du cours :", error);
+    // Récupérer le message d'erreur spécifique si disponible
+    const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message ||
+                          error.message || 
+                          "Erreur lors de la suppression du cours";
+    throw new Error(errorMessage);
   }
 };
+// Fonctions API corrigées
 
-// Ajouter un nouveau cours
+// Ajout d'un nouveau cours avec meilleure gestion des formData
 export const addCourse = async (formData) => {
   try {
+    // Vérification côté client des données essentielles
+    const type_ressource = formData.get('type_ressource');
+    const type_contenu = formData.get('type_contenu') || (type_ressource === 'Tutoriel' ? 'lien' : 'fichier');
+    
+    // Debug: Afficher le contenu du formData pour vérification
+    console.log("Type de ressource:", type_ressource);
+    console.log("Type de contenu:", type_contenu);
+    
+    // Validation des données selon le type de contenu
+    if (type_contenu === 'lien' && !formData.get('url_cours')) {
+      throw new Error("L'URL est obligatoire pour les tutoriels");
+    }
+    
+    if (type_contenu === 'fichier') {
+      const fichier = formData.get('fichier_cours');
+      if (!fichier || (fichier instanceof File && fichier.size === 0)) {
+        throw new Error("Le fichier est obligatoire pour ce type de cours");
+      }
+    }
+    
+    // S'assurer que le type_contenu est correctement défini
+    formData.set('type_contenu', type_contenu);
+    
+    // Envoyer la requête avec les entêtes appropriés
     const response = await axios.post(
       `${API_URL}/api/admin/cours/ajouter`,
       formData,
-      { withCredentials: true }
+      { 
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'multipart/form-data' // Important pour l'upload de fichiers
+        },
+        timeout: 60000 // Augmenter le timeout pour les grands fichiers
+      }
     );
+    
     return response.data;
   } catch (error) {
-    console.error("Erreur lors de l'ajout du cours :", error.response?.data || error.message);
+    console.error("Erreur lors de l'ajout du cours :", error);
+    
+    // Analyse détaillée des erreurs
+    if (error.response?.data?.errors) {
+      const errorMessages = Object.values(error.response.data.errors)
+        .flat()
+        .join(", ");
+      throw new Error(errorMessages || "Erreur de validation du formulaire");
+    }
+    
+    // Si le serveur renvoie un message d'erreur spécifique
+    if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
+    }
+    
     throw error;
   }
 };
 
-// Mettre à jour un cours existant
+// Mise à jour d'un cours existant
 export const updateCourse = async (courseId, formData) => {
   try {
-    const response = await axios.post(
-      `${API_URL}/api/admin/cours/update/${courseId}`,
-      formData,
-      { withCredentials: true }
+    // S'assurer que l'ID du cours est dans le formData
+    formData.set('id_cours', courseId);
+    
+    // Récupérer et vérifier le type de contenu
+    const type_ressource = formData.get('type_ressource');
+    const type_contenu = formData.get('type_contenu') || (type_ressource === 'Tutoriel' ? 'lien' : 'fichier');
+    
+    // S'assurer que le type_contenu est correctement défini
+    formData.set('type_contenu', type_contenu);
+    
+    // Debug: Afficher le contenu du formData pour vérification
+    console.log("Mise à jour du cours ID:", courseId);
+    console.log("Type de ressource:", type_ressource);
+    console.log("Type de contenu:", type_contenu);
+    
+    const response = await axios.post(`${API_URL}/api/admin/cours/update/${courseId}`,formData,
+      { 
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'multipart/form-data' // Important pour l'upload de fichiers
+        },
+        timeout: 60000 // Augmenter le timeout pour les grands fichiers
+      }
     );
+    
     return response.data;
   } catch (error) {
-    console.error("Erreur lors de la mise à jour du cours :", error.response?.data || error.message);
-    throw error;
+    console.error("Erreur lors de la mise à jour du cours :", error);
+    
+    // Gestion détaillée des erreurs
+    if (error.code === 'ECONNABORTED') {
+      throw new Error("La requête a pris trop de temps, veuillez réessayer");
+    }
+    
+    if (error.response?.status === 413) {
+      throw new Error("Le fichier est trop volumineux");
+    }
+    
+    // Si le serveur renvoie un message d'erreur spécifique
+    if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
+    }
+    
+    // Pour les erreurs de validation du formulaire
+    if (error.response?.data?.errors) {
+      const errorMessages = Object.values(error.response.data.errors)
+        .flat()
+        .join(", ");
+      throw new Error(errorMessages || "Erreur de validation du formulaire");
+    }
+    
+    const errorMessage = error.response?.data?.message || error.message || "Erreur lors de la mise à jour du cours";
+    throw new Error(errorMessage);
   }
 };
 
@@ -315,31 +417,6 @@ export const getFavorites = async () => {
   }
 };
 
-// Ajouter un cours aux favoris
-export const addToFavorites = async (coursId) => {
-  try {
-    const response = await axios.post(`${API_URL}/api/profil/favoris/add/${coursId}`, {}, {
-      withCredentials: true
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Erreur lors de l\'ajout aux favoris:', error);
-    throw error;
-  }
-};
-
-// Supprimer un cours des favoris
-export const removeFavorite = async (favoriteId) => {
-  try {
-    const response = await axios.post(`${API_URL}/api/profil/favoris/delete/${favoriteId}`, {}, {
-      withCredentials: true
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Erreur lors de la suppression du favori:', error);
-    throw error;
-  }
-};
 
 // Route de l'historique
 export const getHistory = async () => {

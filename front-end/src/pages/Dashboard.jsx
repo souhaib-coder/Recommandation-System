@@ -312,7 +312,7 @@ const Dashboard = () => {
                 </div>
                 
                 <div className="mt-4 pt-3 border-top">
-                  <Link to="/user/favorites" className="btn btn-outline-primary w-100">
+                  <Link to="/Favoris" className="btn btn-outline-primary w-100">
                     <i className="bi bi-bookmark-fill me-2"></i>Voir mes cours favoris
                   </Link>
                 </div>

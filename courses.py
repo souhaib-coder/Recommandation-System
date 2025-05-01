@@ -3,9 +3,12 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed
 from wtforms import StringField, SelectField, IntegerField, SubmitField, TextAreaField, FileField,URLField
 from wtforms.validators import DataRequired, Optional, NumberRange, URL
 
+import shutil
+import time
 from Models import db,Cours, Favoris,Utilisateurs, Historique_Consultation, Profils_Utilisateurs, Avis,app
 from security import *
 
@@ -50,7 +53,6 @@ class SearchForm(FlaskForm):
     ], validators=[Optional()])
 
     submit = SubmitField('Rechercher')
-
 class CoursForm(FlaskForm):
     nom = StringField("Nom du cours", validators=[DataRequired()])
     type_ressource = SelectField("Type de ressource", 
@@ -82,19 +84,45 @@ class CoursForm(FlaskForm):
                                      ('Apprentissage', 'Apprentissage'), 
                                      ('Approfondissement', 'Approfondissement')],
                             validators=[DataRequired()])
-    durée = IntegerField("Durée (en heures)", validators=[Optional()])
+    durée = IntegerField("Durée (en heures)", validators=[Optional(), NumberRange(min=1, message="La durée doit être positive")])
 
     type_contenu = SelectField('Type de contenu', choices=[
-        ('fichier', 'Fichier'),
+        ('fichier', 'Fichier'), 
         ('lien', 'Lien URL')
-    ], validators=[DataRequired()])
-
-    url_cours = URLField('URL du cours', validators=[
-        Optional(),  # Le champ est facultatif car il ne s'applique que si type_contenu est 'lien'
-        URL(message="L'URL doit être valide et commencer par http:// ou https://")
+    ], validators=[DataRequired(message="Le type de contenu est obligatoire")])
+    
+    url_cours = URLField('URL du tutoriel', validators=[
+        Optional(), 
+        URL(message="L'URL n'est pas valide")
     ])
 
-    fichier_cours = FileField("Télécharger le fichier", validators=[Optional()])
+    fichier_cours = FileField('Fichier du cours', validators=[
+        Optional(),
+        FileAllowed(['pdf', 'docx', 'pptx', 'txt'], 'Seulement les fichiers pdf, docx, pptx et txt sont autorisés.')
+    ])
+    
+    def validate(self):
+        # Skip standard validation if we're processing files
+        # because the file field is populated outside the form
+        if self.type_contenu.data == 'fichier':
+            # Validate just the basic form fields, not the file attachment
+            for field in self:
+                if field.name != 'fichier_cours' and field.name != 'url_cours':
+                    if not field.validate(self):
+                        return False
+            return True
+            
+        # For links, do standard validation
+        if not super(CoursForm, self).validate():
+            return False
+            
+        # Additional validation for links
+        if self.type_contenu.data == 'lien':
+            if not self.url_cours.data:
+                self.url_cours.errors = ["L'URL est obligatoire pour ce type de contenu"]
+                return False
+                
+        return True
 
 
 
@@ -263,169 +291,344 @@ def details_cours(id_cours):
 
 
 ##########admin ajoute cours
-
 @courses_bp.route("/api/admin/cours/ajouter", methods=["GET", "POST"])
 @login_required
 @admin_required
 def ajouter_cours():
-    form = CoursForm()
-
-    if form.validate_on_submit():
-        # Récupérer les données du formulaire
-        nom = form.nom.data
-        type_ressource = form.type_ressource.data
-        domaine = form.domaine.data
-        langue = form.langue.data
-        niveau = form.niveau.data
-        objectifs = form.objectifs.data
-        durée = form.durée.data
-        type_contenu = form.type_contenu.data
+    # For POST requests, process the form data
+    if request.method == 'POST':
+        # Create a form instance and explicitly bind the form with request data
+        form = CoursForm(formdata=request.form, meta={'csrf': False})
         
-        chemin_source = ""
+        # Debug information
+        print(f"Données reçues: {request.form}")
+        print(f"Fichiers reçus: {request.files}")
         
-        # Traitement selon le type de contenu (fichier ou lien)
-        if type_contenu == 'lien':
-            # Vérifier et utiliser l'URL fournie
-            url_cours = form.url_cours.data
+        # Explicitly get the type_contenu - it's important to get this before form validation
+        # as it's used to determine validation rules
+        type_contenu = request.form.get('type_contenu', 'fichier')
+        form.type_contenu.data = type_contenu  # Set this in the form object
+
+        # Handle file uploads separately from form validation
+        if type_contenu == 'fichier':
+            # Check if a file was provided if the content type is 'fichier'
+            if 'fichier_cours' not in request.files or not request.files['fichier_cours'].filename:
+                return jsonify({"error": "Le fichier est obligatoire pour un cours de type fichier."}), 400
+        elif type_contenu == 'lien':
+            # For URL type content, ensure the URL field has data
+            if not request.form.get('url_cours'):
+                return jsonify({"error": "L'URL est obligatoire pour un cours de type lien."}), 400
+
+        # Now validate the form
+        if form.validate():
+            # Extract form data
+            nom = form.nom.data
+            type_ressource = form.type_ressource.data
+            domaine = form.domaine.data
+            langue = form.langue.data
+            niveau = form.niveau.data
+            objectifs = form.objectifs.data
+            durée = form.durée.data if form.durée.data else None
             
-            # Vérification simple de l'URL (peut être améliorée)
-            if not url_cours or not (url_cours.startswith('http://') or url_cours.startswith('https://')):
-                return jsonify({"error": "URL invalide. Elle doit commencer par http:// ou https://"}), 400
-                
-            chemin_source = url_cours
+            chemin_source = ""
             
-        else:  # type_contenu == 'fichier'
-            # Vérifier qu'un fichier a été fourni
-            if not form.fichier_cours.data:
-                return jsonify({"error": "Le fichier est obligatoire pour un nouveau cours de type fichier."}), 400
+            # Process depending on content type
+            if type_contenu == 'lien':
+                url_cours = form.url_cours.data
                 
-            # Vérifier si le fichier a une extension autorisée
-            if form.fichier_cours.data and allowed_file(form.fichier_cours.data.filename):
-                filename = secure_filename(form.fichier_cours.data.filename)
-
-                # Créer la structure de répertoire dynamique
-                folder_path = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', domaine, langue, niveau, type_ressource)
-                if not os.path.exists(folder_path):
-                    os.makedirs(folder_path)
-
-                # Sauvegarder le fichier dans le répertoire
-                filepath = os.path.join(folder_path, filename)
-                form.fichier_cours.data.save(filepath)
+                # URL validation
+                if not url_cours or not (url_cours.startswith('http://') or url_cours.startswith('https://')):
+                    return jsonify({"error": "URL invalide. Elle doit commencer par http:// ou https://"}), 400
+                    
+                chemin_source = url_cours
                 
-                # Stocke un chemin relatif
-                chemin_source = os.path.relpath(filepath, 'static/').replace("\\", "/")
-            else:
-                return jsonify({"error": "Fichier non autorisé."}), 400
+            else:  # type_contenu == 'fichier'
+                fichier = request.files['fichier_cours']
+                
+                # Verify allowed file extension
+                if fichier and allowed_file(fichier.filename):
+                    filename = secure_filename(fichier.filename)
 
-        # Ajouter le cours à la base de données
-        nouveau_cours = Cours(
-            nom=nom,
-            type_ressource=type_ressource,
-            domaine=domaine,
-            langue=langue,
-            niveau=niveau,
-            objectifs=objectifs,
-            durée=durée if durée else None,
-            chemin_source=chemin_source
-        )
+                    # Create dynamic directory structure
+                    folder_path = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', domaine, langue, niveau, type_ressource)
+                    if not os.path.exists(folder_path):
+                        os.makedirs(folder_path)
 
-        db.session.add(nouveau_cours)
-        db.session.commit()
+                    # Save file to directory
+                    filepath = os.path.join(folder_path, filename)
+                    fichier.save(filepath)
+                    
+                    # Store relative path
+                    chemin_source = os.path.relpath(filepath, 'static/').replace("\\", "/")
+                else:
+                    return jsonify({"error": "Fichier non autorisé."}), 400
 
-        return jsonify({"message": "Cours ajouté avec succès", "id": nouveau_cours.id_cours}), 201
+            # Add course to database
+            nouveau_cours = Cours(
+                nom=nom,
+                type_ressource=type_ressource,
+                domaine=domaine,
+                langue=langue,
+                niveau=niveau,
+                objectifs=objectifs,
+                durée=durée,
+                chemin_source=chemin_source
+            )
 
-    return jsonify({"errors": form.errors}), 400
+            db.session.add(nouveau_cours)
+            db.session.commit()
 
+            return jsonify({"message": "Cours ajouté avec succès", "id": nouveau_cours.id_cours}), 201
+        else:
+            # Return validation errors
+            return jsonify({"errors": form.errors}), 400
+    else:
+        # For GET requests, just return the form structure
+        return jsonify({"message": "Utilisez POST pour ajouter un cours"}), 200
 
+# Cette fonction gère spécifiquement le déplacement de fichiers lorsque les métadonnées changent
+def deplacer_fichier_cours(ancien_chemin, nouveau_dossier, ancien_nom_fichier=None):
+    """
+    Déplace un fichier de cours vers un nouvel emplacement basé sur ses métadonnées modifiées.
+    Gère les problèmes de verrouillage de fichiers avec une stratégie de copie puis suppression.
+    
+    Args:
+        ancien_chemin: Chemin complet vers le fichier existant
+        nouveau_dossier: Nouveau dossier de destination
+        ancien_nom_fichier: Nom du fichier (si non fourni, extrait du chemin)
+    
+    Returns:
+        nouveau_chemin: Le nouveau chemin complet du fichier déplacé
+    """
+    import os
+    import shutil
+    import time
+    import uuid
+    
+    # Si le nom du fichier n'est pas fourni, l'extraire du chemin
+    if ancien_nom_fichier is None:
+        ancien_nom_fichier = os.path.basename(ancien_chemin)
+    
+    # Créer le dossier de destination s'il n'existe pas
+    if not os.path.exists(nouveau_dossier):
+        os.makedirs(nouveau_dossier, exist_ok=True)
+    
+    # Chemin complet de destination
+    nouveau_chemin = os.path.join(nouveau_dossier, ancien_nom_fichier)
+    
+    # Si l'ancien et le nouveau chemin sont identiques, aucune action nécessaire
+    if os.path.normpath(ancien_chemin) == os.path.normpath(nouveau_chemin):
+        print(f"Les chemins source et destination sont identiques, aucun déplacement nécessaire: {ancien_chemin}")
+        return ancien_chemin
+    
+    # Vérifier si le fichier source existe
+    if not os.path.exists(ancien_chemin):
+        print(f"Fichier source introuvable: {ancien_chemin}")
+        return nouveau_chemin  # Retourner le nouveau chemin malgré l'erreur pour mise à jour BD
+    
+    # Vérifier si un fichier existe déjà à la destination
+    if os.path.exists(nouveau_chemin):
+        # Générer un nom unique pour éviter les conflits
+        base_name, extension = os.path.splitext(ancien_nom_fichier)
+        unique_id = str(uuid.uuid4())[:8]
+        nouveau_nom_fichier = f"{base_name}_{unique_id}{extension}"
+        nouveau_chemin = os.path.join(nouveau_dossier, nouveau_nom_fichier)
+        print(f"Un fichier existe déjà à la destination. Utilisation d'un nom unique: {nouveau_nom_fichier}")
+    
+    # Stratégie: Essayer de copier d'abord avec plusieurs tentatives
+    copied = False
+    max_retries = 5
+    retry_delay = 1  # secondes
+    
+    for attempt in range(max_retries):
+        try:
+            # Tenter une copie du fichier
+            shutil.copy2(ancien_chemin, nouveau_chemin)
+            copied = True
+            print(f"Copie réussie du fichier de {ancien_chemin} vers {nouveau_chemin}")
+            break
+        except PermissionError as e:
+            print(f"Tentative {attempt+1}/{max_retries}: Fichier verrouillé, nouvel essai dans {retry_delay}s: {e}")
+            time.sleep(retry_delay)
+        except Exception as e:
+            print(f"Erreur inattendue lors de la copie du fichier: {e}")
+            # Pour d'autres erreurs, utiliser une méthode alternative
+            try:
+                print("Tentative avec une méthode alternative de copie...")
+                with open(ancien_chemin, 'rb') as source:
+                    contenu = source.read()
+                with open(nouveau_chemin, 'wb') as destination:
+                    destination.write(contenu)
+                copied = True
+                print("Copie alternative réussie")
+                break
+            except Exception as alt_e:
+                print(f"Échec de la méthode alternative: {alt_e}")
+                time.sleep(retry_delay)
+    
+    # Si la copie a réussi, tenter de supprimer l'ancien fichier
+    if copied:
+        try:
+            # Tenter de supprimer l'ancien fichier
+            for attempt in range(max_retries):
+                try:
+                    os.remove(ancien_chemin)
+                    print(f"Suppression réussie de l'ancien fichier: {ancien_chemin}")
+                    break
+                except PermissionError as e:
+                    print(f"Tentative {attempt+1}/{max_retries}: Impossible de supprimer l'ancien fichier, nouvel essai dans {retry_delay}s: {e}")
+                    time.sleep(retry_delay)
+                except Exception as e:
+                    print(f"Erreur lors de la suppression de l'ancien fichier: {e}")
+                    break  # Ne pas réessayer pour d'autres types d'erreurs
+        except Exception as e:
+            # Si la suppression échoue, ce n'est pas grave, nous avons déjà la copie
+            print(f"Avertissement: Impossible de supprimer l'ancien fichier {ancien_chemin}. Erreur: {e}")
+            print("Le fichier peut nécessiter une suppression manuelle ultérieure.")
+    else:
+        print(f"AVERTISSEMENT: Échec de la copie du fichier après {max_retries} tentatives.")
+        # Malgré l'échec, retourner le nouveau chemin pour mise à jour de la BD
+    
+    return nouveau_chemin
+
+# Mise à jour de la fonction mettre_a_jour_cours pour utiliser notre nouvelle fonction de déplacement
 @courses_bp.route('/api/admin/cours/update/<int:id_cours>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def mettre_a_jour_cours(id_cours):
-    # Récupérer le cours à modifier à partir de l'ID
+    # Obtenir le cours à modifier
     cours_a_modifier = Cours.query.get_or_404(id_cours)
 
-    # Créer un formulaire pré-rempli avec les données actuelles du cours
-    form = CoursForm()
-
-    if form.validate_on_submit():
-        # Récupérer les nouvelles données du formulaire
-        cours_a_modifier.nom = form.nom.data
-        cours_a_modifier.type_ressource = form.type_ressource.data
-        cours_a_modifier.domaine = form.domaine.data
-        cours_a_modifier.langue = form.langue.data
-        cours_a_modifier.niveau = form.niveau.data
-        cours_a_modifier.objectifs = form.objectifs.data
-        cours_a_modifier.durée = form.durée.data
+    # Pour les requêtes POST, traiter les données du formulaire
+    if request.method == 'POST':
+        # Créer une instance de formulaire et la lier explicitement aux données de la requête
+        form = CoursForm(formdata=request.form, meta={'csrf': False})
         
-        # Déterminer le type de contenu actuel (fichier ou lien)
+        # Informations de débogage
+        print(f"Données reçues: {request.form}")
+        print(f"Fichiers reçus: {request.files}")
+        
+        # Obtenir explicitement le type_contenu
+        type_contenu = request.form.get('type_contenu', 'fichier')
+        form.type_contenu.data = type_contenu  # Définir cela dans l'objet form
+        
+        # Vérifier si la source actuelle est un lien
         est_lien = cours_a_modifier.chemin_source.startswith('http://') or cours_a_modifier.chemin_source.startswith('https://')
-        
-        # Si c'est un lien et qu'une nouvelle URL est fournie
-        if est_lien and form.url_cours.data:
-            # Vérification simple de l'URL
-            url_cours = form.url_cours.data
-            if not (url_cours.startswith('http://') or url_cours.startswith('https://')):
-                return jsonify({"error": "URL invalide. Elle doit commencer par http:// ou https://"}), 400
-                
-            cours_a_modifier.chemin_source = url_cours
+
+        if form.validate():
+            # Mise à jour des informations du cours
+            ancien_domaine = cours_a_modifier.domaine
+            ancien_langue = cours_a_modifier.langue
+            ancien_niveau = cours_a_modifier.niveau
+            ancien_type_ressource = cours_a_modifier.type_ressource
             
-        # Si c'est un fichier et qu'un nouveau fichier est fourni
-        elif not est_lien and form.fichier_cours.data:
-            # Vérifier si le fichier a une extension autorisée
-            if allowed_file(form.fichier_cours.data.filename):
-                # Supprimer l'ancien fichier s'il existe
-                ancien_chemin_absolu = os.path.join(app.config['UPLOAD_FOLDER'], cours_a_modifier.chemin_source)
-                if os.path.exists(ancien_chemin_absolu):
-                    os.remove(ancien_chemin_absolu)
+            # Mettre à jour les métadonnées du cours
+            cours_a_modifier.nom = form.nom.data
+            cours_a_modifier.type_ressource = form.type_ressource.data
+            cours_a_modifier.domaine = form.domaine.data
+            cours_a_modifier.langue = form.langue.data
+            cours_a_modifier.niveau = form.niveau.data
+            cours_a_modifier.objectifs = form.objectifs.data
+            cours_a_modifier.durée = form.durée.data if form.durée.data else None
+            
+            # Traitement en fonction du type de contenu
+            if type_contenu == 'lien':
+                url_cours = form.url_cours.data
+                if url_cours:
+                    # Validation d'URL
+                    if not (url_cours.startswith('http://') or url_cours.startswith('https://')):
+                        return jsonify({"error": "URL invalide. Elle doit commencer par http:// ou https://"}), 400
+                    
+                    cours_a_modifier.chemin_source = url_cours
+            
+            elif type_contenu == 'fichier':
+                # Vérifier si un nouveau fichier est fourni
+                if 'fichier_cours' in request.files and request.files['fichier_cours'].filename:
+                    fichier = request.files['fichier_cours']
+                    
+                    # Vérifier l'extension de fichier autorisée
+                    if allowed_file(fichier.filename):
+                        # Supprimer l'ancien fichier s'il existe et n'est pas un lien
+                        if not est_lien:
+                            try:
+                                ancien_chemin_absolu = os.path.join(app.config['UPLOAD_FOLDER'], cours_a_modifier.chemin_source)
+                                if os.path.exists(ancien_chemin_absolu):
+                                    os.remove(ancien_chemin_absolu)
+                            except Exception as e:
+                                print(f"Avertissement: Impossible de supprimer l'ancien fichier: {e}")
+                                # Continuer même si on ne peut pas supprimer l'ancien fichier
 
-                # Enregistrer le nouveau fichier
-                chemin_source = form.fichier_cours.data
-                filename = secure_filename(chemin_source.filename)
+                        # Enregistrer le nouveau fichier
+                        filename = secure_filename(fichier.filename)
+                        folder_path = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', 
+                                                cours_a_modifier.domaine, cours_a_modifier.langue, 
+                                                cours_a_modifier.niveau, cours_a_modifier.type_ressource)
+                        if not os.path.exists(folder_path):
+                            os.makedirs(folder_path)
 
-                # Créer la structure de répertoire dynamique pour le nouveau fichier
-                folder_path = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', 
-                                         cours_a_modifier.domaine, cours_a_modifier.langue, 
-                                         cours_a_modifier.niveau, cours_a_modifier.type_ressource)
-                if not os.path.exists(folder_path):
-                    os.makedirs(folder_path)
+                        filepath = os.path.join(folder_path, filename)
+                        fichier.save(filepath)
 
-                # Sauvegarder le nouveau fichier dans le répertoire
-                filepath = os.path.join(folder_path, filename)
-                chemin_source.save(filepath)
-
-                # Mettre à jour le chemin du fichier dans la base de données
-                cours_a_modifier.chemin_source = os.path.relpath(filepath, 'static/').replace("\\", "/")
-            else:
-                return jsonify({"error": "Fichier non autorisé."}), 400
+                        # Mettre à jour le chemin du fichier dans la base de données
+                        cours_a_modifier.chemin_source = os.path.relpath(filepath, app.config['UPLOAD_FOLDER']).replace("\\", "/")
+                    else:
+                        return jsonify({"error": "Type de fichier non autorisé."}), 400
                 
-        # Si c'est un fichier mais pas de nouveau fichier fourni, et que les infos ont changé
-        elif not est_lien and not form.fichier_cours.data:
-            # On vérifie si on doit déplacer le fichier à cause des changements de domaine/langue/etc.
-            ancien_chemin = os.path.join(app.config['UPLOAD_FOLDER'], cours_a_modifier.chemin_source)
-            if os.path.exists(ancien_chemin):
-                ancien_nom_fichier = os.path.basename(ancien_chemin)
-                
-                nouveau_dossier = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', 
-                                             form.domaine.data, form.langue.data, 
-                                             form.niveau.data, form.type_ressource.data)
-                if not os.path.exists(nouveau_dossier):
-                    os.makedirs(nouveau_dossier)
+                # Si les infos du fichier ont changé mais qu'aucun nouveau fichier n'est fourni
+                elif not est_lien:
+                    # Vérifier si nous devons déplacer le fichier en raison de changements de domaine/langue/etc.
+                    # Détecter les changements qui nécessiteraient un déplacement
+                    metadata_changed = (ancien_domaine != form.domaine.data or 
+                                        ancien_langue != form.langue.data or 
+                                        ancien_niveau != form.niveau.data or 
+                                        ancien_type_ressource != form.type_ressource.data)
+                    
+                    if metadata_changed:
+                        try:
+                            # Ancien chemin complet
+                            ancien_chemin = os.path.join(app.config['UPLOAD_FOLDER'], cours_a_modifier.chemin_source)
+                            
+                            # Nouveau dossier basé sur les métadonnées modifiées
+                            nouveau_dossier = os.path.join(app.config['UPLOAD_FOLDER'], 'cours', 
+                                                        form.domaine.data, form.langue.data, 
+                                                        form.niveau.data, form.type_ressource.data)
+                            
+                            # Déplacer le fichier vers le nouvel emplacement
+                            if os.path.exists(ancien_chemin):
+                                nouveau_chemin_complet = deplacer_fichier_cours(ancien_chemin, nouveau_dossier)
+                                
+                                # Mettre à jour le chemin dans la base de données (chemin relatif)
+                                cours_a_modifier.chemin_source = os.path.relpath(nouveau_chemin_complet, app.config['UPLOAD_FOLDER']).replace("\\", "/")
+                                print(f"Chemin de fichier mis à jour dans la BD: {cours_a_modifier.chemin_source}")
+                            else:
+                                print(f"Avertissement: Le fichier source n'existe pas: {ancien_chemin}")
+                                # Mise à jour du chemin théorique même si le fichier n'existe pas
+                                ancien_nom_fichier = os.path.basename(ancien_chemin)
+                                nouveau_chemin_theorique = os.path.join(nouveau_dossier, ancien_nom_fichier)
+                                cours_a_modifier.chemin_source = os.path.relpath(nouveau_chemin_theorique, app.config['UPLOAD_FOLDER']).replace("\\", "/")
+                        except Exception as e:
+                            print(f"Erreur lors du déplacement du fichier: {e}")
+                            # Continuer pour au moins mettre à jour les métadonnées
 
-                nouveau_chemin = os.path.join(nouveau_dossier, ancien_nom_fichier)
-
-                # Déplacer le fichier s'il n'est pas déjà à cet endroit
-                if ancien_chemin != nouveau_chemin:
-                    os.rename(ancien_chemin, nouveau_chemin)
-
-                # Mettre à jour le chemin dans la BDD
-                cours_a_modifier.chemin_source = os.path.relpath(nouveau_chemin, 'static/').replace("\\", "/")
-
-        # Sauvegarder les modifications dans la base de données
-        db.session.commit()
-
-        return jsonify({"message": "Cours modifié avec succès."}), 200
-
-    return jsonify({"errors": form.errors}), 400
+            # Enregistrer les modifications dans la base de données
+            db.session.commit()
+            return jsonify({"message": "Cours modifié avec succès."}), 200
+        else:
+            # Renvoyer les erreurs de validation
+            return jsonify({"errors": form.errors}), 400
+    else:
+        # Pour les requêtes GET, renvoyer les données actuelles du cours
+        return jsonify({
+            "nom": cours_a_modifier.nom,
+            "type_ressource": cours_a_modifier.type_ressource,
+            "domaine": cours_a_modifier.domaine,
+            "langue": cours_a_modifier.langue,
+            "niveau": cours_a_modifier.niveau,
+            "objectifs": cours_a_modifier.objectifs,
+            "durée": cours_a_modifier.durée,
+            "chemin_source": cours_a_modifier.chemin_source,
+            "type_contenu": "lien" if cours_a_modifier.chemin_source.startswith("http") else "fichier"
+        }), 200
 ######ajou fav
 
 @courses_bp.route('/api/profil/favoris/ajouter/<int:id_cours>', methods=['POST'])

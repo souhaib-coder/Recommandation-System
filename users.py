@@ -227,69 +227,39 @@ def supprimer_compte_api():
 @users_bp.route('/api/profil/favoris', methods=['GET'])
 @login_required
 def afficher_favoris():
-    favoris = Favoris.query.filter_by(user_id=current_user.id_user).all()
-    
-    favoris_list = []
-    for favori in favoris:
-        cours = Cours.query.get(favori.cours_id)
-        if cours:
-            favoris_list.append({
-                "id_favoris": favori.id_favoris,
-                "cours_id": cours.id_cours,
-                "nom": cours.nom,
-                "domaine": cours.domaine,
-                "type_ressource": cours.type_ressource,
-                "niveau": cours.niveau,
-                "langue": cours.langue,
-                "date_ajout": favori.date_ajout.strftime("%Y-%m-%d %H:%M:%S") if favori.date_ajout else None
-            })
-    
-    return jsonify(favoris_list), 200
-
-# Add to favorites
-@users_bp.route('/api/profil/favoris/add/<int:cours_id>', methods=['POST'])
-@login_required
-def ajouter_favori(cours_id):
-    # Check if course exists
-    cours = Cours.query.get(cours_id)
-    if not cours:
-        return jsonify({"error": "Cours introuvable"}), 404
-    
-    # Check if already in favorites
-    favori_existant = Favoris.query.filter_by(user_id=current_user.id_user, cours_id=cours_id).first()
-    if favori_existant:
-        return jsonify({"error": "Ce cours est déjà dans vos favoris"}), 400
-    
     try:
-        nouveau_favori = Favoris(
-            user_id=current_user.id_user,
-            cours_id=cours_id,
-            date_ajout=datetime.now()
-        )
-        db.session.add(nouveau_favori)
-        db.session.commit()
-        return jsonify({"message": "Cours ajouté aux favoris"}), 201
+        favoris = Favoris.query.filter_by(user_id=current_user.id_user).all()
+       
+        favoris_list = []
+        for favori in favoris:
+            cours = Cours.query.get(favori.cours_id)
+            if cours:
+                # Vérification du type de date_ajout pour éviter l'erreur
+                date_format = None
+                if favori.date_ajout:
+                    # Si c'est déjà une chaîne, l'utiliser directement
+                    if isinstance(favori.date_ajout, str):
+                        date_format = favori.date_ajout
+                    # Si c'est un objet datetime, le formater
+                    else:
+                        date_format = favori.date_ajout.strftime("%Y-%m-%d %H:%M:%S")
+                
+                favoris_list.append({
+                    "id_favoris": favori.id_favoris,
+                    "cours_id": cours.id_cours,
+                    "nom": cours.nom,
+                    "domaine": cours.domaine,
+                    "type_ressource": cours.type_ressource,
+                    "niveau": cours.niveau,
+                    "langue": cours.langue,
+                    "date_ajout": date_format
+                })
+       
+        return jsonify(favoris_list), 200
     except Exception as e:
-        db.session.rollback()
+        # Ajouter une journalisation pour le débogage
+        print(f"Erreur dans afficher_favoris: {str(e)}")
         return jsonify({"error": str(e)}), 500
-
-# Remove from favorites
-@users_bp.route('/api/profil/favoris/delete/<int:favori_id>', methods=['POST'])
-@login_required
-def supprimer_favori(favori_id):
-    favori = Favoris.query.filter_by(id_favoris=favori_id, user_id=current_user.id_user).first()
-    
-    if not favori:
-        return jsonify({"error": "Favori introuvable"}), 404
-    
-    try:
-        db.session.delete(favori)
-        db.session.commit()
-        return jsonify({"message": "Favori supprimé avec succès"}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
 # Get user history
 @users_bp.route('/api/profil/historique', methods=['GET'])
 @login_required

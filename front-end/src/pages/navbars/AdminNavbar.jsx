@@ -50,7 +50,7 @@ const AdminNavbar = () => {
     try {
       await logout();
       // Rediriger vers la page de connexion après déconnexion
-      navigate('/login');
+      navigate('/auth');
     } catch (error) {
       console.error("Erreur de déconnexion:", error);
     }

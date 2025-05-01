@@ -17,7 +17,7 @@ const UserNavbar = ({ onSearch }) => {
   // Navigation items definition
   const navItems = [
     { to: "/Dashboard", label: "Dashboard", icon: "speedometer2" },
-    { to: "/user/favorites", label: "Favoris", icon: "heart-fill" },
+    { to: "/Favoris", label: "Favoris", icon: "heart-fill" },
     { to: "/Profile", label: "Profil", icon: "person-circle" },
   ];
 
@@ -53,6 +53,7 @@ const UserNavbar = ({ onSearch }) => {
     e.preventDefault();
     if (onSearch && typeof onSearch === 'function') onSearch(search);
     setMenuOpen(false);
+    
   };
 
   // Handle logout
@@ -61,7 +62,7 @@ const UserNavbar = ({ onSearch }) => {
     try {
       await logout();
       // Rediriger vers la page de connexion après déconnexion
-      navigate('/login');
+      navigate('/auth');
     } catch (error) {
       console.error("Erreur de déconnexion:", error);
     }

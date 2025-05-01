@@ -116,6 +116,7 @@ const editCourse = (course) => {
   // Fonction pour soumettre le formulaire (ajouter ou modifier)
   // Fonction pour soumettre le formulaire (ajouter ou modifier)
 // Fonction pour soumettre le formulaire (ajouter ou modifier)
+// Fonction handleSubmit corrigée pour le formulaire React
 const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
@@ -124,51 +125,81 @@ const handleSubmit = async (e) => {
   try {
     const formDataObj = new FormData();
     
-    // Déterminer le type de contenu basé sur le type de ressource
-    const isTutorial = formData.type_ressource === 'Tutoriel';
+    // Ajouter tous les champs du formulaire de base
+    formDataObj.append('nom', formData.nom);
+    formDataObj.append('type_ressource', formData.type_ressource);
+    formDataObj.append('domaine', formData.domaine);
+    formDataObj.append('langue', formData.langue);
+    formDataObj.append('niveau', formData.niveau);
+    formDataObj.append('objectifs', formData.objectifs);
     
-    // Ajouter tous les champs du formulaire
-    for (const key in formData) {
-      // Ne pas inclure url_cours si ce n'est pas un tutoriel
-      if (!(key === 'url_cours' && !isTutorial)) {
-        formDataObj.append(key, formData[key]);
+    // Ajouter la durée uniquement si elle est définie
+    if (formData.durée) {
+      formDataObj.append('durée', formData.durée);
+    }
+    
+    // Déterminer correctement le type de contenu
+    const isTutorial = formData.type_ressource === 'Tutoriel';
+    const type_contenu = isTutorial ? 'lien' : 'fichier';
+    formDataObj.append('type_contenu', type_contenu);
+    
+    // Si c'est un tutoriel, ajouter l'URL
+    if (isTutorial) {
+      if (!formData.url_cours) {
+        setError("Veuillez saisir une URL valide pour le tutoriel");
+        setLoading(false);
+        return;
+      }
+      formDataObj.append('url_cours', formData.url_cours);
+    } 
+    // Si c'est un cours avec fichier
+    else {
+      // Si on modifie un cours existant et qu'aucun nouveau fichier n'est fourni, c'est OK
+      if (editingCourse && !fichierCours) {
+        console.log("Mode édition sans nouveau fichier - on garde l'ancien fichier");
+      } 
+      // Si on ajoute un nouveau cours, le fichier est obligatoire
+      else if (!editingCourse && !fichierCours) {
+        setError("Veuillez sélectionner un fichier pour le cours");
+        setLoading(false);
+        return;
+      }
+      // Si un fichier est fourni, l'ajouter au formData
+      else if (fichierCours) {
+        formDataObj.append('fichier_cours', fichierCours);
       }
     }
     
-    // Si ce n'est pas un tutoriel et qu'un fichier a été sélectionné, l'ajouter
-    if (!isTutorial && fichierCours) {
-      formDataObj.append('fichier_cours', fichierCours);
-    } else if (!isTutorial && !fichierCours && !editingCourse) {
-      // Si on ajoute un nouveau cours (pas d'édition) et qu'il n'y a pas de fichier
-      setError("Veuillez sélectionner un fichier pour le cours");
-      setLoading(false);
-      return;
-    }
+    console.log("Soumission du formulaire:", {
+      editing: !!editingCourse,
+      type_ressource: formData.type_ressource,
+      type_contenu: type_contenu
+    });
     
-    // Toujours inclure le type de contenu basé sur le type de ressource
-    formDataObj.append('type_contenu', isTutorial ? 'lien' : 'fichier');
-    
-    // Vérifier que l'URL est renseignée pour les tutoriels
-    if (isTutorial && !formData.url_cours) {
-      setError("Veuillez saisir une URL valide pour le tutoriel");
-      setLoading(false);
-      return;
-    }
-    
+    let result;
     if (editingCourse) {
       // Mode édition
-      await updateCourse(editingCourse.id_cours, formDataObj);
+      result = await updateCourse(editingCourse.id_cours, formDataObj);
     } else {
       // Mode ajout
-      await addCourse(formDataObj);
+      result = await addCourse(formDataObj);
     }
     
+    console.log("Résultat de l'opération:", result);
+    
+    // Si succès
     resetForm();
     setShowAddForm(false);
     loadCourses(); // Recharger la liste des cours
   } catch (err) {
-    console.error(err);
-    setError(err.response?.data?.error || err.response?.data?.errors?.fichier_cours || "Une erreur est survenue lors de l'opération");
+    console.error("Erreur dans handleSubmit:", err);
+    
+    // Afficher le message d'erreur le plus pertinent disponible
+    setError(
+      err.response?.data?.error || 
+      err.response?.data?.message || 
+      (err instanceof Error ? err.message : "Une erreur est survenue lors de l'opération")
+    );
   } finally {
     setLoading(false);
   }

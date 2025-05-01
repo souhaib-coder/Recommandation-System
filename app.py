@@ -16,7 +16,6 @@ CORS(app, supports_credentials=True, resources={
         "supports_credentials": True
     }})
 
-app.config['SECRET_KEY'] = 'une_clé_secrète_à_remplacer'
 
 app.register_blueprint(auth_bp, url_prefix="")
 app.register_blueprint(users_bp, url_prefix="")
