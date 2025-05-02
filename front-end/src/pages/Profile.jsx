@@ -801,7 +801,7 @@ const Profile = () => {
                       <p style={{color: "var(--text-light)"}} className="mb-4">
                         Consultez des cours pour les voir apparaître ici.
                       </p>
-                      <Link to="/cours" className="btn" style={{
+                      <Link to="/Dashboard" className="btn" style={{
                         background: "var(--primary-color)",
                         color: "var(--white)",
                         borderRadius: "var(--border-radius-sm)",

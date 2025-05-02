@@ -443,3 +443,42 @@ export const clearHistory = async () => {
     throw error;
   }
 };
+
+//////////////users 
+
+// Fonctions API pour la gestion des utilisateurs
+
+// Récupérer tous les utilisateurs (admin uniquement)
+export const getUsers = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/admin/users`, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des utilisateurs :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Modifier le rôle d'un utilisateur (admin uniquement)
+export const updateUserRole = async (userId, role) => {
+  try {
+    const response = await axios.put(`${API_URL}/api/admin/users/${userId}/role`, 
+      { role }, 
+      {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la modification du rôle utilisateur :", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Bloquer/débloquer un utilisateur (fonctionnalité supplémentaire)
+

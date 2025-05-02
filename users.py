@@ -3,7 +3,7 @@ from flask_login import login_required, current_user, logout_user
 from flask_wtf.csrf import generate_csrf
 from datetime import datetime
 from email_validator import validate_email, EmailNotValidError
-
+from security import *
 from Models import db, Cours, Favoris, Historique_Consultation, Profils_Utilisateurs, Utilisateurs, bcrypt
 
 users_bp = Blueprint('users', __name__)
@@ -18,7 +18,7 @@ def get_csrf_token():
 # API Routes pour le frontend React
 
 @users_bp.route('/api/user/profile', methods=['GET'])
-@login_required
+@login_required_route
 def get_user_profile():
     try:
         print(">> Profil demandé par:", current_user.email)
@@ -73,7 +73,7 @@ def get_user_profile():
         return jsonify({'error': str(e)}), 500
 
 @users_bp.route('/api/user/update', methods=['PUT'])
-@login_required
+@login_required_route
 def update_user_info():
     try:
         data = request.json
@@ -119,7 +119,7 @@ def update_user_info():
         return jsonify({'error': str(e)}), 500
     
 @users_bp.route('/api/user/profil/update', methods=['PUT'])
-@login_required
+@login_required_route
 def update_user_profil():
     try:
         data = request.json
@@ -167,7 +167,7 @@ def update_user_profil():
         return jsonify({'error': str(e)}), 500
 
 @users_bp.route('/api/user/password/reset', methods=['PUT'])
-@login_required
+@login_required_route
 def reset_user_password():
     try:
         data = request.json
@@ -196,7 +196,7 @@ def reset_user_password():
         return jsonify({'error': str(e)}), 500
 
 @users_bp.route('/api/user/supprimer', methods=['POST'])
-@login_required
+@login_required_route
 def supprimer_compte_api():
     try:
         # Supprimer d'abord les favoris de l'utilisateur
@@ -225,7 +225,7 @@ def supprimer_compte_api():
 
 # Get user favorites
 @users_bp.route('/api/profil/favoris', methods=['GET'])
-@login_required
+@login_required_route
 def afficher_favoris():
     try:
         favoris = Favoris.query.filter_by(user_id=current_user.id_user).all()
@@ -262,7 +262,7 @@ def afficher_favoris():
         return jsonify({"error": str(e)}), 500
 # Get user history
 @users_bp.route('/api/profil/historique', methods=['GET'])
-@login_required
+@login_required_route
 def afficher_historique():
     # Récupérer l'historique avec une jointure sur la table Cours
     historique = db.session.query(
@@ -304,7 +304,7 @@ def afficher_historique():
 
 # Clear user history
 @users_bp.route('/api/profil/historique/clear', methods=['POST'])
-@login_required
+@login_required_route
 def effacer_historique():
     try:
         Historique_Consultation.query.filter_by(user_id=current_user.id_user).delete()
@@ -369,7 +369,7 @@ class UpdateProfilForm(FlaskForm):
     submit = SubmitField("Mettre à jour")
 
 @users_bp.route('/profil')
-@login_required
+@login_required_route
 def profil():
     form = DeleteAccountForm()
     profil = Profils_Utilisateurs.query.filter_by(user_id=current_user.id_user).first()
@@ -382,7 +382,7 @@ class ModifierProfilForm(FlaskForm):
     submit = SubmitField("Enregistrer")
 
 @users_bp.route('/profil/modifier', methods=['GET', 'POST'])
-@login_required
+@login_required_route
 def modifier_profil():
     form = ModifierProfilForm(obj=current_user)
     if form.validate_on_submit():
@@ -395,7 +395,7 @@ def modifier_profil():
     return render_template('modifier_profil.html', form=form, user=current_user)
 
 @users_bp.route('/profil/update', methods=['GET', 'POST'])
-@login_required
+@login_required_route
 def update_profil():
     form = UpdateProfilForm()
     profil = Profils_Utilisateurs.query.filter_by(user_id=current_user.id_user).first()
@@ -433,7 +433,7 @@ class DeleteAccountForm(FlaskForm):
 
 
 @users_bp.route('/profil/delete', methods=['POST'])
-@login_required
+@login_required_route
 def supprimer_compte():
     form = DeleteAccountForm()
     if form.validate_on_submit():  # Vérifie le token CSRF
@@ -467,7 +467,7 @@ class ChangerMotDePasseForm(FlaskForm):
 
 
 @users_bp.route('/profil/changer_mot_de_passe/reset', methods=['GET', 'POST'])
-@login_required
+@login_required_route
 def changer_mot_de_passe():
     form = ChangerMotDePasseForm()
     if form.validate_on_submit():
@@ -479,14 +479,14 @@ def changer_mot_de_passe():
 #######
 #####
 @users_bp.route('/profil/favoris')
-@login_required
+@login_required_route
 def afficher_favoris():
     utilisateur = current_user
     favoris = utilisateur.favoris
     return render_template('favoris.html', utilisateur=utilisateur, favoris=favoris, cours=Cours)
 
 @users_bp.route('/supprimer_favori/<int:favori_id>', methods=['POST'])
-@login_required
+@login_required_route
 def supprimer_favori(favori_id):
     favori = Favoris.query.filter_by(id_favoris=favori_id).first()
     if favori:
@@ -498,7 +498,7 @@ def supprimer_favori(favori_id):
     return redirect(url_for('users.afficher_favoris'))
 
 @users_bp.route('/profil/historique')
-@login_required
+@login_required_route
 def afficher_historique():
     historique = Historique_Consultation.query.filter_by(user_id=current_user.id_user).all()
     return render_template('historique.html', historique=historique, cours=Cours)'''

@@ -43,7 +43,7 @@ const DetailCours = () => {
         if (error.response?.status === 401) {
           setError("Vous devez être connecté pour accéder à ce cours");
           // Rediriger vers la page de connexion après un court délai
-          setTimeout(() => navigate("/connexion"), 2000);
+          setTimeout(() => navigate("/auth"), 2000);
         } else {
           setError("Impossible de charger les détails du cours");
         }

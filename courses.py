@@ -147,7 +147,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 
 @courses_bp.route('/api/cours', methods=['GET'])
-@login_required
+@login_required_route
 def search_cours():
     user_id = current_user.id_user
     # Récupérer les paramètres de la requête
@@ -204,7 +204,7 @@ def search_cours():
 
 ##########
 @courses_bp.route('/api/admin/cours', methods=['GET'])
-@login_required
+@login_required_route
 @admin_required
 def AdminCours():
 
@@ -238,7 +238,7 @@ def AdminCours():
 
 #######
 @courses_bp.route('/api/cours/details/<int:id_cours>', methods=['GET', 'POST'])
-@login_required
+@login_required_route
 def details_cours(id_cours):
     cours = Cours.query.get_or_404(id_cours)
     form=ajouter_avis(id_cours)
@@ -292,7 +292,7 @@ def details_cours(id_cours):
 
 ##########admin ajoute cours
 @courses_bp.route("/api/admin/cours/ajouter", methods=["GET", "POST"])
-@login_required
+@login_required_route
 @admin_required
 def ajouter_cours():
     # For POST requests, process the form data
@@ -493,7 +493,7 @@ def deplacer_fichier_cours(ancien_chemin, nouveau_dossier, ancien_nom_fichier=No
 
 # Mise à jour de la fonction mettre_a_jour_cours pour utiliser notre nouvelle fonction de déplacement
 @courses_bp.route('/api/admin/cours/update/<int:id_cours>', methods=['GET', 'POST'])
-@login_required
+@login_required_route
 @admin_required
 def mettre_a_jour_cours(id_cours):
     # Obtenir le cours à modifier
@@ -632,7 +632,7 @@ def mettre_a_jour_cours(id_cours):
 ######ajou fav
 
 @courses_bp.route('/api/profil/favoris/ajouter/<int:id_cours>', methods=['POST'])
-@login_required
+@login_required_route
 def ajouter_favoris(id_cours):
     user_id = current_user.id_user  # Récupérer l'ID de l'utilisateur connecté
 
@@ -655,7 +655,7 @@ def ajouter_favoris(id_cours):
 
 
 @courses_bp.route('/api/admin/cours/delete/<int:id_cours>', methods=['POST'])
-@login_required
+@login_required_route
 @admin_required
 def supprimer_cours(id_cours):
     # Vérifier si l'utilisateur est un administrateur
@@ -682,7 +682,7 @@ def supprimer_cours(id_cours):
 ####
 
 @courses_bp.route('/api/cours/avis/<int:id_cours>', methods=['GET', 'POST'])
-@login_required
+@login_required_route
 def ajouter_avis(id_cours):
     form = AvisForm()
     cours = Cours.query.get_or_404(id_cours)
@@ -858,7 +858,7 @@ def cours_recommandes(user_id):
 
 
 @courses_bp.route('/api/dashboard', methods=['GET'])
-@login_required
+@login_required_route
 def dashboard():
 
 
@@ -910,7 +910,7 @@ def dashboard():
 # Routes pour le tableau de bord administrateur
 
 @courses_bp.route('/api/admin/stats', methods=['GET'])
-@login_required
+@login_required_route
 @admin_required
 def admin_stats():
     """Récupère les statistiques générales pour le dashboard administrateur"""
@@ -960,7 +960,7 @@ def admin_stats():
 
 
 @courses_bp.route('/api/admin/top-courses', methods=['GET'])
-@login_required
+@login_required_route
 @admin_required
 def top_courses():
     """Récupère les 10 cours les plus consultés avec statistiques détaillées"""
@@ -997,7 +997,7 @@ def top_courses():
 
 
 @courses_bp.route('/api/admin/courses-activity', methods=['GET'])
-@login_required
+@login_required_route
 @admin_required
 def courses_activity():
     """Récupère l'activité des cours (consultations et favoris) sur une période donnée"""
@@ -1100,7 +1100,7 @@ def courses_activity():
 
 
 @courses_bp.route('/api/admin/users-activity', methods=['GET'])
-@login_required
+@login_required_route
 @admin_required
 def users_activity():
     """Récupère l'activité des utilisateurs sur une période donnée"""

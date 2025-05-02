@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Link, useNavigate } from 'react-router-dom';
+import "../css/AuthStyle.css";
 
 const AuthPage = () => {
   // États pour gérer les différentes vues
@@ -255,44 +256,50 @@ const AuthPage = () => {
   };
 
   // Soumission des formulaires
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setMessage("");
+const handleRegister = async (e) => {
+  e.preventDefault();
+  setMessage("");
+  
+  if (!validateForm()) {
+    return;
+  }
+  
+  setLoading(true);
+  try {
+    const res = await axios.post("http://localhost:5000/api/inscription", formData);
+    setMessage(res.data.message || "Inscription réussie !");
     
-    if (!validateForm()) {
-      return;
-    }
+    // Stocker l'email avant de réinitialiser le formulaire
+    const userEmail = formData.email;
     
-    setLoading(true);
-    try {
-      const res = await axios.post("http://localhost:5000/api/inscription", formData);
-      setMessage(res.data.message || "Inscription réussie !");
-      
-      // Réinitialiser le formulaire
-      setFormData({
-        nom: "",
-        prenom: "",
-        email: "",
-        password: "",
-        confirmation_password: "",
-        domaine_intérêt: "",
-        objectifs: "",
-      });
-      
-      // Rediriger vers la page de connexion après une inscription réussie
-      setTimeout(() => {
-        setActiveView("login");
-        setMessage("Inscription réussie ! Vous pouvez maintenant vous connecter.");
-      }, 1500);
-    } catch (err) {
-      if (err.response?.data?.errors) {
-        setErrors(err.response.data.errors);
-      }
-      setMessage(err.response?.data?.message || "Erreur lors de l'inscription.");
-    } finally {
-      setLoading(false);
+    // Réinitialiser le formulaire
+    setFormData({
+      nom: "",
+      prenom: "",
+      email: "",
+      password: "",
+      confirmation_password: "",
+      domaine_intérêt: "",
+      objectifs: "",
+    });
+    
+    // Rediriger vers la page de connexion après une inscription réussie
+    // et pré-remplir l'email de connexion
+    setTimeout(() => {
+      setActiveView("login");
+      setMessage("Inscription réussie ! Vous pouvez maintenant vous connecter.");
+      // Pré-remplir l'email dans le formulaire de connexion
+      setLoginData(prev => ({ ...prev, email: userEmail }));
+    }, 1500);
+  } catch (err) {
+    if (err.response?.data?.errors) {
+      setErrors(err.response.data.errors);
     }
-  };
+    setMessage(err.response?.data?.message || "Erreur lors de l'inscription.");
+  } finally {
+    setLoading(false);
+  }
+}; 
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -673,513 +680,6 @@ const AuthPage = () => {
           </p>
         )}
       </div>
-      <style jsx>{`
-      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Montserrat', sans-serif;
-}
-
-.auth-page {
-  background: #f0f2f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  height: 100vh;
-}
-
-.auth-container {
-  background-color: var(--white);
-  border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow);
-  position: relative;
-  overflow: hidden;
-  width: 900px;
-  max-width: 100%;
-  min-height: 550px;
-  max-height: 90vh;
-}
-
-.auth-container p {
-  font-size: 13px;
-  line-height: 18px;
-  letter-spacing: 0.3px;
-  margin: 10px 0;
-  color: var(--text-light);
-}
-
-.auth-container span {
-  font-size: 12px;
-}
-
-.auth-container a {
-  color: var(--text-dark);
-  font-size: 12px;
-  text-decoration: none;
-  margin: 8px 0;
-  transition: color 0.3s ease;
-}
-
-.auth-container a:hover {
-  color: var(--primary-color);
-}
-
-.auth-container button {
-  background-color: var(--primary-color);
-  color: var(--white);
-  font-size: 14px;
-  padding: 10px 35px;
-  border: none;
-  border-radius: var(--border-radius-sm);
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  margin-top: 12px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.auth-container button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-.auth-container button.auth-hidden {
-  background-color: transparent;
-  border: 2px solid var(--white);
-}
-
-.auth-container button.auth-hidden:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.auth-container form {
-  background-color: var(--white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  padding: 0 40px;
-  height: 100%;
-  transition: all var(--transition-speed) ease-in-out;
-}
-
-.auth-form-container {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  width: 50%;
-  transition: all var(--transition-speed) ease-in-out;
-}
-
-.auth-toggle-link {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--text-light);
-}
-
-.auth-link-button {
-  background: none;
-  border: none;
-  color: var(--primary-color);
-  font-weight: 600;
-  margin: 0 0 0 5px;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-  font-size: inherit;
-}
-
-.auth-link-button:hover {
-  color: var(--gradient-start);
-}
-
-/* INPUTS */
-.auth-container input,
-.auth-container select {
-  background-color: var(--input-bg);
-  border: none;
-  margin: 6px 0;
-  padding: 12px;
-  font-size: 13px;
-  border-radius: var(--border-radius-sm);
-  width: 100%;
-  height: 42px;
-  outline: none;
-  transition: border 0.3s ease, background-color 0.3s ease;
-}
-
-.auth-container input:focus,
-.auth-container select:focus {
-  background-color: var(--white);
-  border: 1px solid var(--primary-color);
-}
-
-/* SELECTS STYLING */
-.auth-select-container {
-  position: relative;
-  width: 100%;
-  margin: 6px 0;
-}
-
-.auth-custom-select {
-  display: block;
-  width: 100%;
-  height: 42px;
-  padding: 12px;
-  color: var(--text-dark);
-  background-color: var(--input-bg);
-  border: none;
-  border-radius: var(--border-radius-sm);
-  appearance: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 13px;
-}
-
-.auth-custom-select:focus {
-  outline: none;
-  border: 1px solid var(--primary-color);
-  background-color: var(--white);
-}
-
-.auth-select-container::after {
-  content: '';
-  position: absolute;
-  right: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid var(--text-dark);
-  pointer-events: none;
-}
-
-/* POSITIONNEMENT DES FORMULAIRES */
-.auth-sign-in {
-  left: 0;
-  z-index: 2;
-}
-
-.auth-sign-up {
-  left: 0;
-  z-index: 1;
-  opacity: 0;
-  visibility: hidden;
-}
-
-.auth-container.active .auth-sign-in {
-  transform: translateX(100%);
-  opacity: 0;
-  visibility: hidden;
-}
-
-.auth-container.active .auth-sign-up {
-  transform: translateX(100%);
-  opacity: 1;
-  visibility: visible;
-  z-index: 5;
-}
-
-/* TOGGLE CONTAINER STYLING */
-.auth-toggle-container {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 50%;
-  height: 100%;
-  overflow: hidden;
-  transition: all var(--transition-speed) ease-in-out;
-  border-radius: 150px 0 0 100px;
-  z-index: 1000;
-}
-
-.auth-container.active .auth-toggle-container {
-  transform: translateX(-100%);
-  border-radius: 0 150px 100px 0;
-}
-
-.auth-toggle {
-  height: 100%;
-  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
-  color: var(--white);
-  position: relative;
-  left: -100%;
-  height: 100%;
-  width: 200%;
-  transform: translateX(0);
-  transition: all var(--transition-speed) ease-in-out;
-}
-
-.auth-container.active .auth-toggle {
-  transform: translateX(50%);
-}
-
-.auth-toggle-panel {
-  position: absolute;
-  width: 50%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  padding: 0 30px;
-  text-align: center;
-  top: 0;
-  transform: translateX(0);
-  transition: all var(--transition-speed) ease-in-out;
-}
-
-.auth-toggle-panel h1 {
-  color: var(--white);
-  font-size: 26px;
-  margin-bottom: 10px;
-}
-
-.auth-toggle-panel p {
-  color: var(--white);
-  opacity: 0.9;
-  margin-bottom: 20px;
-  font-size: 14px;
-}
-
-.auth-toggle-left {
-  transform: translateX(-200%);
-}
-
-.auth-container.active .auth-toggle-left {
-  transform: translateX(0);
-}
-
-.auth-toggle-right {
-  right: 0;
-  transform: translateX(0);
-}
-
-.auth-container.active .auth-toggle-right {
-  transform: translateX(200%);
-}
-
-/* AFFICHAGE DES TITRES */
-.auth-visible-title {
-  margin-bottom: 10px;
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--text-dark);
-}
-
-/* MESSAGES - Repositionnés dans la zone blanche pour une meilleure lisibilité */
-.auth-message {
-  position: absolute;
-  top: 15px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(45, 160, 168, 0.1);
-  color: var(--primary-color);
-  padding: 8px 15px;
-  border-radius: var(--border-radius-sm);
-  font-size: 13px;
-  text-align: center;
-  max-width: 80%;
-  z-index: 2000;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  border-left: 3px solid var(--primary-color);
-}
-
-.auth-message.error {
-  background-color: rgba(255, 0, 0, 0.1);
-  color: #cc0000;
-  border-left: 3px solid #cc0000;
-}
-
-/* STYLE POUR LES ERREURS */
-.auth-error-message {
-  color: #cc0000;
-  font-size: 11px;
-  margin-top: -4px;
-  margin-bottom: 4px;
-  text-align: left;
-  width: 100%;
-}
-
-/* STYLE POUR LES FORMULAIRES COMPACTS */
-.compact-form {
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 15px 40px;
-}
-
-.form-row {
-  display: flex;
-  width: 100%;
-  gap: 8px;
-}
-
-.form-column {
-  flex: 1;
-  min-width: 0;
-}
-
-.form-group {
-  width: 100%;
-  margin-bottom: 3px;
-}
-
-/* STYLE POUR L'INDICATEUR DE FORCE DU MOT DE PASSE */
-.password-strength-wrapper {
-  width: 100%;
-  margin-top: 0;
-  margin-bottom: 6px;
-}
-
-.password-strength-container {
-  width: 100%;
-  height: 4px;
-  background-color: #eee;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.password-strength-bar {
-  height: 100%;
-  transition: width 0.3s ease, background-color 0.3s ease;
-}
-
-.password-strength-info {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  margin-top: 3px;
-  color: var(--text-light);
-}
-
-.password-feedback {
-  cursor: help;
-}
-
-/* MOT DE PASSE OUBLIÉ */
-.forgot-password-link {
-  display: block;
-  margin: 8px 0;
-  color: var(--text-light);
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: none;
-  transition: color 0.3s ease;
-  align-self: flex-start;
-}
-
-.forgot-password-link:hover {
-  color: var(--primary-color);
-}
-
-/* BOUTONS PRINCIPAUX */
-.auth-container button.auth-submit-button {
-  background-color: var(--primary-color);
-  width: 100%;
-  padding: 12px;
-  font-size: 14px;
-  margin-top: 15px;
-  border-radius: var(--border-radius-sm);
-}
-
-/* Bouton S'INSCRIRE pour le panneau bleu */
-.auth-toggle-panel button {
-  background-color: transparent;
-  border: 2px solid white;
-  padding: 10px 30px;
-  font-size: 14px;
-  border-radius: var(--border-radius-sm);
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.auth-toggle-panel button:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-/* RESPONSIVE DESIGN */
-@media (max-width: 768px) {
-  .auth-container {
-    min-height: 480px;
-    width: 90%;
-  }
-  
-  .auth-form-container {
-    width: 100%;
-  }
-  
-  .auth-toggle-container {
-    display: none;
-  }
-  
-  .auth-container.active .auth-sign-in {
-    transform: translateX(0);
-    opacity: 0;
-    visibility: hidden;
-    z-index: 1;
-  }
-  
-  .auth-container.active .auth-sign-up {
-    transform: translateX(0);
-    opacity: 1;
-    visibility: visible;
-    z-index: 5;
-  }
-  
-  .auth-sign-up {
-    left: 0;
-    width: 100%;
-  }
-  
-  .auth-sign-in {
-    width: 100%;
-  }
-  
-  .form-row {
-    flex-direction: column;
-    gap: 0;
-  }
-  
-  .auth-container form {
-    padding: 0 20px;
-  }
-
-  .auth-message {
-    max-width: 90%;
-    top: 10px;
-  }
-  
-  .auth-visible-title {
-    font-size: 22px;
-  }
-}
-
-/* STYLES POUR LES BOUTONS DÉSACTIVÉS */
-.auth-container button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* Styles pour les boutons de connexion et inscription */
-.auth-container button[type="submit"] {
-  margin-top: 15px;
-  width: 100%;
-  font-size: 14px;
-  padding: 12px;
-  border-radius: var(--border-radius-sm);
-}`}</style>
     </div>
 
   );

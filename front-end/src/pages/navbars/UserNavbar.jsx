@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { logout } from "../../api/api"; // Assurez-vous d'importer la fonction logout de votre API
+import "../../css/NavStyle/UserNavbarStyle.css";
+
 
 const UserNavbar = ({ onSearch }) => {
   const [scrolled, setScrolled] = useState(false);
@@ -207,60 +209,7 @@ const UserNavbar = ({ onSearch }) => {
       </div>
     </div>
   </nav>
-    <style jsx>{`
-      /* Base navbar styles */
-        .navbar {
-          transition: all 0.4s ease;
-          padding: 0.6rem 0;
-          z-index: 1030;
-          min-height: 60px; /* Reduced height */
-        }
-        
-        .navbar-default {
-          background: transparent; /* No color initially */
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        .navbar-scrolled {
-          background: rgba(255, 255, 255, 0.98);
-          backdrop-filter: blur(15px);
-          box-shadow: 0 5px 20px -5px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Logo */
-        .logo-container {
-          display: flex;
-          align-items: center;
-        }
-        
-        .logo-icon {
-          width: 32px; /* Smaller */
-          height: 32px; /* Smaller */
-          background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
-          border-radius: 8px; /* Smaller radius */
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-size: 1.1rem; /* Smaller */
-          box-shadow: 0 4px 10px rgba(71, 118, 230, 0.3); 
-          transition: all 0.3s ease;
-        }
-        
-        .navbar-brand:hover .logo-icon {
-          transform: rotate(15deg) scale(1.1);
-        }
-        
-        .logo-text {
-          font-weight: 700;
-          margin-left: 10px;
-          font-size: 1.2rem; /* Smaller */
-          background: linear-gradient(135deg, #4776E6 0%, #8E54E9 100%);
-          -webkit-background-clip: text;
-          background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }`}
-        </style>
+    
       </>
   );
 };
