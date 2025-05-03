@@ -201,7 +201,6 @@ const UserNavbar = ({ onSearch }) => {
                 transition: "var(--transition-speed)"
               }}
             >
-              <i className="bi bi-box-arrow-right me-2"></i>
               Déconnexion
             </button>
           </li>

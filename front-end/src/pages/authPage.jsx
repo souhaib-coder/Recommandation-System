@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import { Link, useNavigate } from 'react-router-dom';
 import "../css/AuthStyle.css";
+import { login, register,resetPassword,forgotPassword } from '../api/api'; // Importez les fonctions d'API
 
 const AuthPage = () => {
   // États pour gérer les différentes vues
@@ -53,11 +53,11 @@ const AuthPage = () => {
     isValid: false
   });
 
-  // Configurer le token CSRF pour les requêtes axios
+  // Configurer le token CSRF pour les requêtes
   useEffect(() => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     if (csrfToken) {
-      axios.defaults.headers.common['X-CSRFToken'] = csrfToken;
+      // Vous pouvez configurer le token CSRF dans vos fonctions d'API au lieu d'ici
     }
     
     // Vérifier s'il y a un token dans l'URL pour la réinitialisation du mot de passe
@@ -256,68 +256,68 @@ const AuthPage = () => {
   };
 
   // Soumission des formulaires
-const handleRegister = async (e) => {
-  e.preventDefault();
-  setMessage("");
-  
-  if (!validateForm()) {
-    return;
-  }
-  
-  setLoading(true);
-  try {
-    const res = await axios.post("http://localhost:5000/api/inscription", formData);
-    setMessage(res.data.message || "Inscription réussie !");
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setMessage("");
     
-    // Stocker l'email avant de réinitialiser le formulaire
-    const userEmail = formData.email;
-    
-    // Réinitialiser le formulaire
-    setFormData({
-      nom: "",
-      prenom: "",
-      email: "",
-      password: "",
-      confirmation_password: "",
-      domaine_intérêt: "",
-      objectifs: "",
-    });
-    
-    // Rediriger vers la page de connexion après une inscription réussie
-    // et pré-remplir l'email de connexion
-    setTimeout(() => {
-      setActiveView("login");
-      setMessage("Inscription réussie ! Vous pouvez maintenant vous connecter.");
-      // Pré-remplir l'email dans le formulaire de connexion
-      setLoginData(prev => ({ ...prev, email: userEmail }));
-    }, 1500);
-  } catch (err) {
-    if (err.response?.data?.errors) {
-      setErrors(err.response.data.errors);
+    if (!validateForm()) {
+      return;
     }
-    setMessage(err.response?.data?.message || "Erreur lors de l'inscription.");
-  } finally {
-    setLoading(false);
-  }
-}; 
+    
+    setLoading(true);
+    try {
+      // Utiliser la fonction d'API au lieu d'axios
+      const data = await register(formData);
+      setMessage(data.message || "Inscription réussie !");
+      
+      // Stocker l'email avant de réinitialiser le formulaire
+      const userEmail = formData.email;
+      
+      // Réinitialiser le formulaire
+      setFormData({
+        nom: "",
+        prenom: "",
+        email: "",
+        password: "",
+        confirmation_password: "",
+        domaine_intérêt: "",
+        objectifs: "",
+      });
+      
+      // Rediriger vers la page de connexion après une inscription réussie
+      // et pré-remplir l'email de connexion
+      setTimeout(() => {
+        setActiveView("login");
+        setMessage("Inscription réussie ! Vous pouvez maintenant vous connecter.");
+        // Pré-remplir l'email dans le formulaire de connexion
+        setLoginData(prev => ({ ...prev, email: userEmail }));
+      }, 1500);
+    } catch (err) {
+      if (err.response?.data?.errors) {
+        setErrors(err.response.data.errors);
+      }
+      setMessage(err.response?.data?.message || "Erreur lors de l'inscription.");
+    } finally {
+      setLoading(false);
+    }
+  }; 
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setMessage("");
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/api/connexion", loginData, {
-        withCredentials: true
-      });
-      setMessage(res.data.message || "Connexion réussie !");
+      // Utiliser la fonction d'API au lieu d'axios
+      const data = await login(loginData);
+      setMessage(data.message || "Connexion réussie !");
       
       // Rediriger vers la page d'accueil après connexion réussie
       setTimeout(() => {
-          if (res.data.admin) {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
+        if (data.admin) {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       }, 1000);
     } catch (err) {
       setMessage(err.response?.data?.message || "Identifiants invalides.");
@@ -326,15 +326,16 @@ const handleRegister = async (e) => {
     }
   };
   
+  // Ces fonctions nécessitent de nouvelles fonctions d'API à ajouter dans le fichier api.jsx
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     setMessage("");
     setLoading(true);
     
     try {
-      // Fix: Update the endpoint URL to match your Flask blueprint route
-      const res = await axios.post("http://localhost:5000/api/forgot-password", forgotPasswordData);
-      setMessage(res.data.message || "Email de réinitialisation envoyé !");
+      // Cette fonction doit être créée dans api.jsx
+      const response = await forgotPassword(forgotPasswordData);
+      setMessage(response.message || "Email de réinitialisation envoyé !");
       setForgotPasswordData({ email: "" });
     } catch (err) {
       setMessage(err.response?.data?.message || "Erreur lors de l'envoi de l'email.");
@@ -353,13 +354,10 @@ const handleRegister = async (e) => {
     
     setLoading(true);
     try {
-      // Fix: Update the endpoint URL to match your Flask blueprint route
-      const res = await axios.post("http://localhost:5000/api/reset-password", {
-        token: token,
-        new_password: resetPasswordData.new_password
-      });
+      // Cette fonction doit être créée dans api.jsx
+      const response = await resetPassword(token, resetPasswordData.new_password);
       
-      setMessage(res.data.message || "Mot de passe réinitialisé avec succès !");
+      setMessage(response.message || "Mot de passe réinitialisé avec succès !");
       
       // Rediriger vers la page de connexion après réinitialisation réussie
       setTimeout(() => {
@@ -681,7 +679,6 @@ const handleRegister = async (e) => {
         )}
       </div>
     </div>
-
   );
 };
 

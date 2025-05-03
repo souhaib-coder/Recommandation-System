@@ -2,7 +2,7 @@ import axios from 'axios';
 const API_URL = 'http://localhost:5000';
 axios.defaults.withCredentials = true;
 
-// 🔐 Auth
+// 🔐 Auth - Ces fonctions existent déjà dans votre API
 export const login = async (credentials) => {
   const res = await axios.post(`${API_URL}/api/connexion`, credentials);
   return res.data;
@@ -12,6 +12,31 @@ export const register = async (userData) => {
   const res = await axios.post(`${API_URL}/api/inscription`, userData);
   return res.data;
 };
+
+// Nouvelles fonctions à ajouter pour la gestion de mot de passe
+export const forgotPassword = async (data) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/forgot-password`, data);
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la demande de réinitialisation du mot de passe:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const resetPassword = async (token, newPassword) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/reset-password`, {
+      token: token,
+      new_password: newPassword
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la réinitialisation du mot de passe:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
 
 
 export const logout = async () => {
@@ -25,7 +50,41 @@ export const logout = async () => {
     throw error;
   }
 };
+////////////////////
 
+// Fonction pour vérifier si l'utilisateur est connecté
+export const checkAuth = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/auth/check`);
+    return { authenticated: true, data: response.data };
+  } catch (error) {
+    if (error.response && error.response.status === 401) {
+      return { authenticated: false };
+    }
+    throw error;
+  }
+};
+
+// Fonction pour vérifier si l'utilisateur est admin
+export const checkAdmin = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/admin/check`);
+    return { isAdmin: true, data: response.data };
+  } catch (error) {
+    if (error.response && error.response.status === 403) {
+      return { isAdmin: false, error: 'Accès refusé' };
+    } else if (error.response && error.response.status === 401) {
+      return { isAdmin: false, error: 'Non connecté' };
+    }
+    throw error;
+  }
+};
+
+
+
+
+
+///////////////
 export const getDashboardData = async (params = {}) => {
   try {
     const response = await axios.get(`${API_URL}/api/dashboard`, {
@@ -446,39 +505,67 @@ export const clearHistory = async () => {
 
 //////////////users 
 
-// Fonctions API pour la gestion des utilisateurs
 
-// Récupérer tous les utilisateurs (admin uniquement)
+// Fonctions d'API simplifiées
 export const getUsers = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/admin/users`, {
+    const response = await axios.get(`${API_URL}/api/admin/users`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateUserRole = async (userId, role) => {
+  try {
+    const response = await axios.put(`${API_URL}/api/admin/users/${userId}/role`, { 
+      role: role // Envoi sans accent comme attendu par le backend
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+
+
+////////////////
+
+
+export const getUserProgressions = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/progression`, {
       withCredentials: true
     });
     return response.data;
   } catch (error) {
-    console.error("Erreur lors de la récupération des utilisateurs :", error.response?.data || error.message);
+    console.error("Erreur lors de la récupération des progressions :", error.response?.data || error.message);
     throw error;
   }
 };
 
-// Modifier le rôle d'un utilisateur (admin uniquement)
-export const updateUserRole = async (userId, role) => {
+// Récupérer la progression de l'utilisateur dans un cours spécifique
+export const getCourseProgression = async (courseId) => {
   try {
-    const response = await axios.put(`${API_URL}/api/admin/users/${userId}/role`, 
-      { role }, 
-      {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const response = await axios.get(`${API_URL}/api/progression/${courseId}`, {
+      withCredentials: true
+    });
     return response.data;
   } catch (error) {
-    console.error("Erreur lors de la modification du rôle utilisateur :", error.response?.data || error.message);
+    console.error("Erreur lors de la récupération de la progression du cours :", error.response?.data || error.message);
     throw error;
   }
 };
 
-// Bloquer/débloquer un utilisateur (fonctionnalité supplémentaire)
-
+// Mettre à jour la progression de l'utilisateur dans un cours
+export const updateCourseProgression = async (courseId, progressionData) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/progression/${courseId}`, progressionData, {
+      withCredentials: true
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de la progression :", error.response?.data || error.message);
+    throw error;
+  }
+};

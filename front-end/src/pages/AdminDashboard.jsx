@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getAdminStats, getTopCourses, getCoursesActivity, getUsersActivity } from '../api/api';
+import { getAdminStats, getTopCourses, getCoursesActivity, getUsersActivity,checkAuth,checkAdmin } from '../api/api';
 import { 
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, 
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import AdminNavbar from './navbars/AdminNavbar';
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 
 const COLORS = ['#4361ee', '#3a0ca3', '#7209b7', '#f72585', '#4cc9f0', '#4895ef'];
@@ -18,10 +18,30 @@ const AdminDashboard = () => {
   const [coursesActivity, setCoursesActivity] = useState([]);
   const [usersActivity, setUsersActivity] = useState([]);
   const [timeFrame, setTimeFrame] = useState('week');
+  const navigate = useNavigate(); // Hook de navigation
+
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const authStatus = await checkAuth();
+                
+                if (!authStatus.authenticated) {
+                  // L'utilisateur n'est pas connecté, redirection vers la page de connexion
+                  navigate('/auth', { replace: true });
+                  return;
+                }
+                
+              const adminStatus = await checkAdmin();
+                
+                if (!adminStatus.isAdmin) {
+                  if (adminStatus.error === 'Non connecté') {
+                    navigate('/auth', { replace: true });
+                  } else {
+                    navigate('/', { replace: true });
+                  }
+                  return;
+                }
         setLoading(true);
         
         // Fetch general statistics

@@ -5,6 +5,7 @@ import {
   toggleFavorite,
   deleteCourse,
   submitReview,
+  checkAuth
 } from "../api/api";
 import AdminNavbar from "./navbars/AdminNavbar";
 import UserNavbar from "./navbars/UserNavbar";
@@ -30,6 +31,13 @@ const DetailCours = () => {
   useEffect(() => {
     const fetchCourseDetails = async () => {
       try {
+        const authStatus = await checkAuth();
+                if (!authStatus.authenticated) {
+                  // L'utilisateur n'est pas connecté, redirection vers la page de connexion
+                  navigate('/auth', { replace: true });
+                  return;
+                }
+        
         setLoading(true);
         setError("");
         const data = await getCourseDetails(id);

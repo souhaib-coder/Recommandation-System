@@ -1,24 +1,21 @@
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required, current_user
+from flask import Blueprint, request, jsonify
+from flask_login import current_user
 from werkzeug.utils import secure_filename
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
 from wtforms import StringField, SelectField, IntegerField, SubmitField, TextAreaField, FileField,URLField
 from wtforms.validators import DataRequired, Optional, NumberRange, URL
 
+
+import uuid
 import shutil
 import time
 from Models import db,Cours, Favoris,Utilisateurs, Historique_Consultation, Profils_Utilisateurs, Avis,app
 from security import *
 
 from security import admin_required
-from sqlalchemy import func, desc, asc, case, extract
-
-import matplotlib.pyplot as plt
-import pandas as pd
-import io
-import base64
+from sqlalchemy import func, desc
 from datetime import datetime, timedelta, timezone
 
 #from recommendations import hybrid_recommendations
@@ -53,6 +50,7 @@ class SearchForm(FlaskForm):
     ], validators=[Optional()])
 
     submit = SubmitField('Rechercher')
+
 class CoursForm(FlaskForm):
     nom = StringField("Nom du cours", validators=[DataRequired()])
     type_ressource = SelectField("Type de ressource", 
@@ -128,6 +126,7 @@ class CoursForm(FlaskForm):
 
  # Limite de taille du fichier (16 Mo max)
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -202,12 +201,12 @@ def search_cours():
     
     return jsonify(result), 200
 
-##########
+
+
 @courses_bp.route('/api/admin/cours', methods=['GET'])
 @login_required_route
 @admin_required
 def AdminCours():
-
     # Récupérer les paramètres de la requête
     search = request.args.get('search', '')
     domaine = request.args.get('domaine', '')
@@ -300,11 +299,8 @@ def ajouter_cours():
         # Create a form instance and explicitly bind the form with request data
         form = CoursForm(formdata=request.form, meta={'csrf': False})
         
-        # Debug information
-        print(f"Données reçues: {request.form}")
-        print(f"Fichiers reçus: {request.files}")
+
         
-        # Explicitly get the type_contenu - it's important to get this before form validation
         # as it's used to determine validation rules
         type_contenu = request.form.get('type_contenu', 'fichier')
         form.type_contenu.data = type_contenu  # Set this in the form object
@@ -400,10 +396,6 @@ def deplacer_fichier_cours(ancien_chemin, nouveau_dossier, ancien_nom_fichier=No
     Returns:
         nouveau_chemin: Le nouveau chemin complet du fichier déplacé
     """
-    import os
-    import shutil
-    import time
-    import uuid
     
     # Si le nom du fichier n'est pas fourni, l'extraire du chemin
     if ancien_nom_fichier is None:
@@ -576,7 +568,6 @@ def mettre_a_jour_cours(id_cours):
                 
                 # Si les infos du fichier ont changé mais qu'aucun nouveau fichier n'est fourni
                 elif not est_lien:
-                    # Vérifier si nous devons déplacer le fichier en raison de changements de domaine/langue/etc.
                     # Détecter les changements qui nécessiteraient un déplacement
                     metadata_changed = (ancien_domaine != form.domaine.data or 
                                         ancien_langue != form.langue.data or 
@@ -759,19 +750,6 @@ def ajouter_avis(id_cours):
     return form
 
 def enregistrer_consultation(id_user, id_cours, titre_cours):
-    # Vérifier si la consultation existe déjà
-    '''consultation_existante = Historique_Consultation.query.filter_by(user_id=id_user, cours_id=id_cours).first()
-    
-    if not consultation_existante:
-        Cours.nombre_vues += 1
-        nouvelle_consultation = Historique_Consultation(
-            user_id=id_user,
-            cours_id=id_cours
-        )
-        db.session.add(nouvelle_consultation)
-        db.session.commit()
-    
-    print(f"Consultation ajoutée pour user {id_user} sur le cours {id_cours}")  # Debugging'''
     cours = Cours.query.get(id_cours)
     aujourd_hui = datetime.now(timezone.utc).date()  # Date d'aujourd'hui au format YYYY-MM-DD en UTC
     historique = Historique_Consultation.query.filter_by(user_id=current_user.id_user, cours_id=id_cours, date_consultation=aujourd_hui).first()
@@ -860,33 +838,8 @@ def cours_recommandes(user_id):
 @courses_bp.route('/api/dashboard', methods=['GET'])
 @login_required_route
 def dashboard():
-
-
-    user_id = current_user.id_user
-
-    # --- 1. Récupération des cours favoris ---
-    favoris = Favoris.query.filter_by(user_id=user_id).all()
-    favoris_cours = [{
-        "id_cours": fav.cours.id_cours,
-        "nom": fav.cours.nom,
-        "domaine": fav.cours.domaine,
-        "type_ressource": fav.cours.type_ressource,
-        "niveau": fav.cours.niveau,
-        "langue": fav.cours.langue,
-        "objectifs": fav.cours.objectifs,
-        "chemin_source": fav.cours.chemin_source,
-        "nombre_vues": fav.cours.nombre_vues
-    } for fav in favoris]
-
-    # --- 2. Recommandations personnalisées ---
-    
-
-    # --- 3. Vérifier si l'utilisateur est un admin ---
-
-    # --- 4. Retour final ---
     return jsonify({
         "admin": current_user.rôle == 'admin',
-        "favoris": favoris_cours,
     }), 200
 
 ##########

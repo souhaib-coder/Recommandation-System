@@ -6,10 +6,14 @@ import {
   changePassword, 
   deleteAccount, 
   getHistory, 
-  clearHistory 
+  clearHistory,
+  getDashboardData,
+  checkAuth
 } from '../api/api';
-import UserNavbar from './navbars/UserNavbar';
-import { Link } from 'react-router-dom';
+import AdminNavbar from "./navbars/AdminNavbar";
+import UserNavbar from "./navbars/UserNavbar";
+
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   FaUserCircle, 
   FaEdit, 
@@ -52,6 +56,9 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const navigate = useNavigate(); // Hook de navigation
+
 
   // États pour l'édition
   const [editingPersonalInfo, setEditingPersonalInfo] = useState(false);
@@ -77,6 +84,8 @@ const Profile = () => {
   // Récupérer les données du profil utilisateur
   const fetchUserData = useCallback(async () => {
     try {
+      const userData = await getDashboardData();
+      setIsAdmin(userData.admin);
       setLoading(true);
       const response = await fetchProfile();
       setUser(response.user);
@@ -86,6 +95,9 @@ const Profile = () => {
       setEditedUser(response.user);
       setEditedProfil(response.profil || {});
       setLoading(false);
+
+      
+
     } catch (err) {
       setError('Erreur lors du chargement des données utilisateur');
       setLoading(false);
@@ -105,6 +117,7 @@ const Profile = () => {
 
   // Charger les données au montage du composant
   useEffect(() => {
+
     fetchUserData();
   }, [fetchUserData]);
 
@@ -120,8 +133,8 @@ const Profile = () => {
     const icons = {
       "Informatique": "bi-laptop",
       "Mathématiques": "bi-calculator",
-      "Physique": "bi-atom",
-      "Chimie": "bi-flask",
+      "Physique": "bi-circle-half",
+      "Chimie": "bi-arrows-move",
       "Langues": "bi-translate",
     };
     return icons[domaine] || "bi-book";
@@ -294,32 +307,27 @@ const Profile = () => {
 
   return (
     <div className="education-profile" style={{background: "var(--light-bg)", minHeight: "100vh"}}>
-      <UserNavbar onSearch={handleSearchFromNav} />
-      
+    {isAdmin ? <AdminNavbar /> : <UserNavbar/>}  
       {/* Hero Banner */}
-      <div className="hero-section text-white position-relative" style={{
+      <div className="hero-section text-white position-relative d-flex align-items-center" style={{
         background: `linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%)`,
-        minHeight: "250px",
-        marginTop: "70px",
-        padding: "3rem 0",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.1)"
+        minHeight: "160px",
+        marginTop: "66px", // correspond à la navbar
+        padding: "2rem 0",
       }}>
-        <div className="container position-relative" style={{zIndex: "2"}}>
-          <div className="row align-items-center">
-            <div className="col-lg-12 py-4 text-center">
-              <h1 className="display-4 fw-bold mb-3" style={{textShadow: "2px 2px 4px rgba(0,0,0,0.1)"}}>
-                <RiGraduationCapFill className="me-3" />
-                Votre Profil
-              </h1>
-              <p className="lead mb-0 opacity-90" style={{fontSize: "1.2rem"}}>
-                Gérez vos informations personnelles et vos préférences d'apprentissage
-              </p>
-            </div>
-          </div>
+        <div className="container text-center" style={{ zIndex: 2 }}>
+          <br /><br />
+          <h1 className="fw-bold display-6 mb-2" style={{ letterSpacing: "-0.5px" }}>
+          <RiGraduationCapFill className="me-3" />
+          Votre Profil
+            </h1>
+          <p className="lead" style={{ opacity: 0.85 }}>Gérez vos informations personnelles et vos préférences d'apprentissage</p>
+          <br /><br />
         </div>
+
         <div className="position-absolute bottom-0 start-0 w-100">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" style={{display: "block"}}>
-            <path fill="var(--light-bg)" fillOpacity="1" d="M0,64L80,69.3C160,75,320,85,480,80C640,75,800,53,960,48C1120,43,1280,53,1360,58.7L1440,64L1440,100L1360,100C1280,100,1120,100,960,100C800,100,640,100,480,100C320,100,160,100,80,100L0,100Z"></path>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" style={{ display: "block" }}>
+            <path fill="var(--light-bg)" d="M0,64L80,69.3C160,75,320,85,480,80C640,75,800,53,960,48C1120,43,1280,53,1360,58.7L1440,64L1440,100H0Z"></path>
           </svg>
         </div>
       </div>

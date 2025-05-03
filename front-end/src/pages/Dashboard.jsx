@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { getDashboardData, searchCours, toggleFavorite } from "../api/api";
+import { getDashboardData, searchCours, toggleFavorite, checkAuth } from "../api/api";
 import AdminNavbar from "./navbars/AdminNavbar";
 import UserNavbar from "./navbars/UserNavbar";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -11,6 +11,8 @@ const Dashboard = () => {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const location = useLocation();
+
+  const navigate = useNavigate(); // Hook de navigation
 
   // États pour les filtres de recherche
   const [search, setSearch] = useState("");
@@ -46,7 +48,13 @@ const Dashboard = () => {
       });
   }, [coursPerPage]);
 
-  const fetchDashboard = useCallback(() => {
+  const fetchDashboard = useCallback(async () => {
+    const authStatus = await checkAuth(); 
+        if (!authStatus.authenticated) {
+          // L'utilisateur n'est pas connecté, redirection vers la page de connexion
+          navigate('/auth', { replace: true });
+          return;
+        }
     setLoading(true);
     getDashboardData()
       .then((data) => {
@@ -102,15 +110,15 @@ const Dashboard = () => {
   
   // Fonction pour obtenir les icônes par domaine
   const getDomaineIcon = (domaine) => {
-    const icons = {
-      "Informatique": "bi-laptop",
-      "Mathématiques": "bi-calculator",
-      "Physique": "bi-atom",
-      "Chimie": "bi-flask",
-      "Langues": "bi-translate",
+    const images = {
+      "Informatique": "/informatics.jpg",
+      "Mathématiques": "/math.jpg", 
+      "Physique": "/physics.jpg",
+      "Chimie": "/chimie.jpg",
+      "Langues": "/lang.jpg",
     };
-    return icons[domaine] || "bi-book";
-  };
+    return images[domaine] || "/informatics.jpg"; // Image par défaut si domaine non trouvé
+  }
 
   // Fonction pour obtenir les couleurs par niveau
   const getNiveauBadgeClass = (niveau) => {
@@ -125,6 +133,7 @@ const Dashboard = () => {
   // Gestion des favoris
   const handleToggleFavorite = async (courseId, isFav) => {
     try {
+
       await toggleFavorite(courseId);
       
       // Mise à jour locale de l'état du favori
@@ -373,10 +382,13 @@ const Dashboard = () => {
                         transition: "var(--transition-speed)"
                       }}>
                         <div className="position-relative">
-                          <div className="card-img-top bg-light" style={{height: "140px", background: "var(--accent-bg)"}}>
-                            <div className="h-100 d-flex align-items-center justify-content-center">
-                              <i className={`${getDomaineIcon(c.domaine)} display-4`} style={{color: "var(--primary-color)"}}></i>
-                            </div>
+                        <div className="card-img-top" style={{height: "140px", overflow: "hidden"}}>
+                            <img 
+                              src={getDomaineIcon(c.domaine)} 
+                              alt={c.domaine} 
+                              className="w-100 h-100" 
+                              style={{objectFit: "cover"}} 
+                            />
                           </div>
                           <div className="position-absolute" style={{top: "15px", right: "15px"}}>
                             <span className={`badge ${getNiveauBadgeClass(c.niveau)}`}>
@@ -418,9 +430,6 @@ const Dashboard = () => {
                         </div>
                         
                         <div className="card-footer border-top d-flex justify-content-between align-items-center py-3" style={{background: "var(--white)"}}>
-                          <button className="btn btn-sm" style={{color: "var(--text-dark)"}}>
-                            <i className="bi bi-info-circle me-1"></i>Détails
-                          </button>
                           <Link to={`/DetailCours/${c.id_cours}`} className="btn btn-sm" style={{
                             background: "var(--primary-color)",
                             color: "var(--white)"

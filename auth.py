@@ -5,14 +5,15 @@ from itsdangerous import URLSafeTimedSerializer
 from wtforms import StringField, PasswordField, SubmitField, SelectField
 from wtforms.validators import InputRequired, Email, Length, EqualTo, ValidationError
 from flask_login import login_user, logout_user, login_required
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 from security import *
+import uuid
 
 
 from Models import bcrypt
 
-from Models import db, login_manager, Utilisateurs, Profils_Utilisateurs,mail
+from Models import db, login_manager, Utilisateurs, Profils_Utilisateurs,mail, app
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -114,7 +115,7 @@ def register():
             return jsonify({'message': 'Email déjà utilisé'}), 400
         
         while True:
-            new_id = "R" + str(random.randint(100000000, 999999999))
+            new_id = "U" + str(uuid.uuid4().hex)[:8]
             if not Utilisateurs.query.filter_by(id_user=new_id).first():
                 break
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')

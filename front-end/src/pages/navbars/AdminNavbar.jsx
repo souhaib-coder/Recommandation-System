@@ -45,6 +45,12 @@ const AdminNavbar = () => {
     setMenuOpen(!menuOpen);
   };
 
+  // Basculer vers le mode utilisateur
+  const switchToUserMode = () => {
+    navigate('/Dashboard');
+    setMenuOpen(false);
+  };
+
   // Handle logout
   const handleLogout = async (e) => {
     e.preventDefault();
@@ -89,6 +95,27 @@ const AdminNavbar = () => {
           <div className={`collapse navbar-collapse ${menuOpen ? "show" : ""}`}>
             {/* Navigation links */}
             <ul className="navbar-nav ms-auto mb-2 mb-lg-0">
+              {/* Mode Utilisateur Button */}
+              <li className="nav-item">
+                <button 
+                  className="nav-link d-flex align-items-center" 
+                  onClick={switchToUserMode}
+                  style={{
+                    color: "var(--text-dark)",
+                    opacity: 0.9,
+                    fontWeight: "500",
+                    padding: "0.5rem 1rem",
+                    transition: "var(--transition-speed)",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer"
+                  }}
+                >
+                  <i className="bi bi-person-badge me-2"></i>
+                  Mode Utilisateur
+                </button>
+              </li>
+              
               {navItems.map((item, i) => (
                 <li className="nav-item" key={i}>
                   <Link 
@@ -145,26 +172,17 @@ const AdminNavbar = () => {
               {/* Admin dropdown */}
               <li className="nav-item mx-2 d-flex align-items-center">
                 <div className="dropdown">
-                  <button 
-                    className="btn btn-light btn-sm rounded-circle"
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "rgba(240, 240, 240, 0.5)",
-                      transition: "var(--transition-speed)"
-                    }}
-                    id="adminMenuButton" 
-                    data-bs-toggle="dropdown" 
-                    aria-expanded="false"
-                  >
+                <Link className="btn btn-light btn-sm position-relative rounded-circle" to="/Profile" style={{
+                    width: "36px",
+                    height: "36px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(240, 240, 240, 0.5)",
+                    transition: "var(--transition-speed)"
+                  }}>
                     <i className="bi bi-person-circle"></i>
-                  </button>
-                  <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="adminMenuButton">
-                    <li><Link className="dropdown-item" to="/Profile">Mon profil</Link></li>
-                  </ul>
+                </Link>
                 </div>
               </li>
               

@@ -2,26 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminNavbar from './navbars/AdminNavbar';
 import UserNavbar from './navbars/UserNavbar';
-import { getDashboardData, getFavorites, toggleFavorite } from '../api/api';
-
+import { getDashboardData, getFavorites, toggleFavorite, checkAuth } from '../api/api';
+import { useNavigate } from 'react-router-dom';
 const Favoris = () => {
   const [favoris, setFavoris] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [search, setSearch] = useState("");
+  const navigate = useNavigate(); // Hook de navigation
 
   // Fonction pour obtenir les icônes par domaine
   const getDomaineIcon = (domaine) => {
-    const icons = {
-      "Informatique": "bi-laptop",
-      "Mathématiques": "bi-calculator",
-      "Physique": "bi-atom",
-      "Chimie": "bi-flask",
-      "Langues": "bi-translate",
+    const images = {
+      "Informatique": "/informatics.jpg",
+      "Mathématiques": "/math.jpg", 
+      "Physique": "/physics.jpg",
+      "Chimie": "/chimie.jpg",
+      "Langues": "/lang.jpg",
     };
-    return icons[domaine] || "bi-book";
-  };
+    return images[domaine] || "/informatics.jpg"; // Image par défaut si domaine non trouvé
+  }
 
   // Fonction pour obtenir les couleurs par niveau
   const getNiveauBadgeClass = (niveau) => {
@@ -50,6 +51,13 @@ const Favoris = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const authStatus = await checkAuth();
+        
+        if (!authStatus.authenticated) {
+          // L'utilisateur n'est pas connecté, redirection vers la page de connexion
+          navigate('/auth', { replace: true });
+          return;
+        }
         // Utiliser la fonction getFavorites de l'API
         const favsData = await getFavorites();
         setFavoris(favsData);
@@ -82,11 +90,13 @@ const Favoris = () => {
         padding: "2rem 0",
       }}>
         <div className="container text-center" style={{ zIndex: 2 }}>
+          <br /><br />
           <h1 className="fw-bold display-6 mb-2" style={{ letterSpacing: "-0.5px" }}>
             <i className="bi bi-heart-fill me-2 text-white" style={{ opacity: 0.85 }}></i>
             Vos favoris, en un clic
           </h1>
           <p className="lead" style={{ opacity: 0.85 }}>Tous les cours que vous aimez à portée de main.</p>
+          <br /><br />
         </div>
 
         <div className="position-absolute bottom-0 start-0 w-100">
@@ -118,11 +128,14 @@ const Favoris = () => {
               <div className="col-md-6 col-lg-4" key={c.id_favoris}>
                 <div className="card h-100 border-0 shadow-sm shadow-hover overflow-hidden" style={{ borderRadius: "var(--border-radius-sm)" }}>
                   <div className="position-relative">
-                    <div className="card-img-top bg-light" style={{ height: "140px", background: "var(--accent-bg)" }}>
-                      <div className="h-100 d-flex align-items-center justify-content-center">
-                        <i className={`${getDomaineIcon(c.domaine)} display-4`} style={{ color: "var(--primary-color)" }}></i>
-                      </div>
-                    </div>
+                  <div className="card-img-top" style={{height: "140px", overflow: "hidden"}}>
+                            <img 
+                              src={getDomaineIcon(c.domaine)} 
+                              alt={c.domaine} 
+                              className="w-100 h-100" 
+                              style={{objectFit: "cover"}} 
+                            />
+                          </div>
                     <div className="position-absolute" style={{ top: "15px", right: "15px" }}>
                       <span className={`badge ${getNiveauBadgeClass(c.niveau)}`}>{c.niveau}</span>
                     </div>
@@ -161,9 +174,7 @@ const Favoris = () => {
                   </div>
 
                   <div className="card-footer border-top d-flex justify-content-between align-items-center py-3" style={{ background: "var(--white)" }}>
-                    <Link to={`/DetailCours/${c.cours_id}`} className="btn btn-sm" style={{ color: "var(--text-dark)" }}>
-                      <i className="bi bi-info-circle me-1"></i>Détails
-                    </Link>
+                    
                     <Link
                       to={`/DetailCours/${c.cours_id}`}
                       className="btn btn-sm"

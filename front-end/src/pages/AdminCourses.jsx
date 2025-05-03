@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { addCourse, updateCourse, deleteCourse, AdminCours } from '../api/api';
+import { addCourse, updateCourse, deleteCourse, AdminCours,checkAuth,checkAdmin } from '../api/api';
 import { PlusCircle, Edit, Trash2, XCircle, Save, Eye, Book, FileText } from 'lucide-react';
 import AdminNavbar from './navbars/AdminNavbar';
+import { Link, useLocation, useNavigate } from "react-router-dom";
+
 
 const AdminCourses = () => {
 
@@ -29,6 +31,9 @@ const AdminCourses = () => {
   const [filterDomain, setFilterDomain] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [coursesPerPage] = useState(10);
+  const navigate = useNavigate(); // Hook de navigation
+ 
+
 
   
 // Changer de page
@@ -41,6 +46,25 @@ const paginate = (pageNumber) => {
   const loadCourses = async () => {
     setLoading(true);
     try {
+      const authStatus = await checkAuth();
+        
+        if (!authStatus.authenticated) {
+          // L'utilisateur n'est pas connecté, redirection vers la page de connexion
+          navigate('/auth', { replace: true });
+          return;
+        }
+
+      const adminStatus = await checkAdmin();
+        
+        if (!adminStatus.isAdmin) {
+          if (adminStatus.error === 'Non connecté') {
+            navigate('/auth', { replace: true });
+          } else {
+            navigate('/', { replace: true });
+          }
+          return;
+        }
+
       const data = await AdminCours();
       setCourses(data);
     } catch (err) {
@@ -52,6 +76,7 @@ const paginate = (pageNumber) => {
   };
 
   useEffect(() => {
+    
     loadCourses();
   }, []);
 
