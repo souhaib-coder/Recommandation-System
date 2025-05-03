@@ -130,15 +130,15 @@ const Profile = () => {
 
   // Fonction pour obtenir les icônes par domaine
   const getDomaineIcon = (domaine) => {
-    const icons = {
-      "Informatique": "bi-laptop",
-      "Mathématiques": "bi-calculator",
-      "Physique": "bi-circle-half",
-      "Chimie": "bi-arrows-move",
-      "Langues": "bi-translate",
+    const images = {
+      "Informatique": "/informatics.jpg",
+      "Mathématiques": "/math.jpg", 
+      "Physique": "/physics.jpg",
+      "Chimie": "/chimie.jpg",
+      "Langues": "/lang.jpg",
     };
-    return icons[domaine] || "bi-book";
-  };
+    return images[domaine] || "/informatics.jpg"; // Image par défaut si domaine non trouvé
+  }
 
   // Fonction pour obtenir les couleurs par niveau
   const getNiveauBadgeClass = (niveau) => {
@@ -839,11 +839,14 @@ const Profile = () => {
       }}
       >
         <div className="position-relative">
-          <div className="card-img-top bg-light" style={{height: "100px", background: "var(--accent-bg)"}}>
-            <div className="h-100 d-flex align-items-center justify-content-center">
-              <i className={`${getDomaineIcon(item.domaine)} display-5`} style={{color: "var(--primary-color)"}}></i>
-            </div>
-          </div>
+        <div className="card-img-top" style={{height: "140px", overflow: "hidden"}}>
+                            <img 
+                              src={getDomaineIcon(item.domaine)} 
+                              alt={item.domaine} 
+                              className="w-100 h-100" 
+                              style={{objectFit: "cover"}} 
+                            />
+                          </div>
           <div className="position-absolute" style={{top: "8px", right: "8px"}}>
             <span className={`badge ${getNiveauBadgeClass(item.niveau)}`} style={{fontSize: "0.65rem"}}>
               {item.niveau}
